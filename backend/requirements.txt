@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlalchemy[asyncio]
+asyncpg
+pydantic-settings
+celery[redis]
+python-dotenv
+alembic
+psycopg2-binary
+requests
+beautifulsoup4
+playwright
+openai
+langchain

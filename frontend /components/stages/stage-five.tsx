@@ -1,0 +1,416 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { MessageSquare, Calendar, CheckCircle2, Mail, MessageCircle, Repeat2, Video, X } from 'lucide-react';
+import { workflowManager, type WorkflowState, type Lead, type Meeting } from '@/lib/workflow-context';
+import { toastManager } from '@/components/toast-notification';
+import { Clock } from 'lucide-react'; // Import Clock component
+
+const sentimentColors = {
+  'Very Interested': 'bg-green-100 text-green-800',
+  'Interested': 'bg-yellow-100 text-yellow-800',
+  'Neutral': 'bg-gray-100 text-gray-800',
+  'Uninterested': 'bg-red-100 text-red-800',
+}; // Define sentimentColors object
+
+export default function StageFive() {
+  const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [meetingForm, setMeetingForm] = useState({
+    date: '',
+    time: '',
+    meetingType: 'Google Meet' as const,
+  });
+
+  const persistenceLeads = workflowState?.leads.filter((lead) => !lead.replied) || []; // Define persistenceLeads variable
+  const hotLeads = workflowState?.leads.filter((lead) => lead.replied && lead.sentiment === 'Very Interested') || []; // Define hotLeads variable
+
+  useEffect(() => {
+    const unsubscribe = workflowManager.subscribe(setWorkflowState);
+    return unsubscribe;
+  }, []);
+
+  // Simulate replies and followups over time
+  useEffect(() => {
+    if (!workflowState?.emailsDrafted) return;
+
+    const intervals: NodeJS.Timeout[] = [];
+
+    // Simulate some leads replying after 8 seconds
+    intervals.push(
+      setTimeout(() => {
+        const updatedLeads = workflowState.leads.map((lead, idx) => {
+          if (idx === 0 || idx === 3) {
+            return {
+              ...lead,
+              replied: true,
+              sentiment: 'Very Interested' as const,
+              followupCount: 0 as const,
+            };
+          }
+          return lead;
+        });
+
+        workflowManager.setState({ leads: updatedLeads });
+
+        toastManager.notify({
+          title: 'Replies Received',
+          message: 'Sarah Johnson and James Rodriguez replied to your email!',
+          type: 'success',
+        });
+      }, 8000)
+    );
+
+    // Simulate followups after 12 seconds
+    intervals.push(
+      setTimeout(() => {
+        const updatedLeads = workflowState.leads.map((lead) => {
+          if (!lead.replied) {
+            return {
+              ...lead,
+              followupCount: 1 as const,
+            };
+          }
+          return lead;
+        });
+
+        workflowManager.setState({ leads: updatedLeads });
+
+        toastManager.notify({
+          title: 'Follow-ups Sent',
+          message: 'Automatic follow-up emails sent to non-responders.',
+          type: 'info',
+        });
+      }, 12000)
+    );
+
+    return () => {
+      intervals.forEach(clearTimeout);
+    };
+  }, [workflowState?.emailsDrafted]);
+
+  if (!workflowState?.leads.length) {
+    return (
+      <div className="space-y-6">
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <MessageSquare className="w-6 h-6 text-primary" />
+            <h2 className="text-2xl font-bold text-foreground">The Closing</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Manage follow-ups and engage with hot leads
+          </p>
+        </div>
+
+        <Card className="p-8 border-border bg-secondary text-center">
+          <p className="text-muted-foreground mb-4">
+            Complete the previous stages to see your leads and engagement status
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  const leads = workflowState.leads;
+  const selectedLead = leads.find((l) => l.id === selectedLeadId) || leads[0];
+
+  return (
+    <div className="space-y-6">
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <MessageSquare className="w-6 h-6 text-primary" />
+          <h2 className="text-2xl font-bold text-foreground">The Closing</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Monitor engagement and schedule meetings with hot leads
+        </p>
+      </div>
+
+      <Card className="p-6 border-border bg-card">
+        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Mail className="w-5 h-5 text-primary" />
+          Leads Overview & Engagement Tracking
+        </h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          Complete lead engagement tracking with automated follow-ups and meeting scheduling. Your task: attend scheduled meetings.
+        </p>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="text-foreground">Name</TableHead>
+                <TableHead className="text-foreground">Company</TableHead>
+                <TableHead className="text-foreground">Email</TableHead>
+                <TableHead className="text-foreground text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs">Sent</div>
+                </TableHead>
+                <TableHead className="text-foreground text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <MessageCircle className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs">Replied</div>
+                </TableHead>
+                <TableHead className="text-foreground text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <Repeat2 className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs">Follow-ups</div>
+                </TableHead>
+                <TableHead className="text-foreground text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs">Meeting</div>
+                </TableHead>
+                <TableHead className="text-foreground text-center">
+                  <div className="text-xs">Time</div>
+                </TableHead>
+                <TableHead className="text-foreground">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {leads.map((lead) => (
+                <TableRow key={lead.id} className="border-border hover:bg-secondary/20">
+                  <TableCell className="font-medium text-foreground">{lead.name}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{lead.company}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm text-xs">{lead.email}</TableCell>
+                  <TableCell className="text-center">
+                    {lead.emailSent ? (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-primary/10 text-primary inline-block">
+                        ✓
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-muted text-muted-foreground inline-block">
+                        ✗
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {lead.replied ? (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-accent/10 text-accent inline-block">
+                        ✓
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-muted text-muted-foreground inline-block">
+                        ✗
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {lead.followupCount > 0 ? (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-primary/10 text-primary inline-block">
+                        {lead.followupCount}x
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-muted text-muted-foreground inline-block">
+                        -
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {lead.meeting ? (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-primary/10 text-primary inline-block">
+                        ✓ Scheduled
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-muted text-muted-foreground inline-block">
+                        -
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {lead.meeting ? lead.meeting.time : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {lead.meeting ? (
+                      <Button size="sm" className="gap-2 bg-accent/10 text-accent hover:bg-accent/20" variant="ghost">
+                        <Video className="w-3 h-3" />
+                        Join
+                      </Button>
+                    ) : lead.replied ? (
+                      <Button
+                        onClick={() => {
+                          setSelectedLeadId(lead.id);
+                          setShowCalendarModal(true);
+                        }}
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        <Calendar className="w-3 h-3" />
+                        Schedule
+                      </Button>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      {/* Meeting Scheduler Modal */}
+      {showCalendarModal && selectedLeadId && (
+        <Card className="p-6 border-border bg-card">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-xl font-bold text-foreground">{leads.find((l) => l.id === selectedLeadId)?.name}</h3>
+              <p className="text-sm text-muted-foreground">{leads.find((l) => l.id === selectedLeadId)?.company}</p>
+            </div>
+            <button
+              onClick={() => {
+                setShowCalendarModal(false);
+                setMeetingForm({ date: '', time: '', meetingType: 'Google Meet' });
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Preferred Date
+              </label>
+              <input
+                type="date"
+                value={meetingForm.date}
+                onChange={(e) => setMeetingForm({ ...meetingForm, date: e.target.value })}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Time
+              </label>
+              <select
+                value={meetingForm.time}
+                onChange={(e) => setMeetingForm({ ...meetingForm, time: e.target.value })}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground text-sm"
+              >
+                <option value="">Select time</option>
+                <option value="9:00 AM - 10:00 AM">9:00 AM - 10:00 AM</option>
+                <option value="10:00 AM - 11:00 AM">10:00 AM - 11:00 AM</option>
+                <option value="11:00 AM - 12:00 PM">11:00 AM - 12:00 PM</option>
+                <option value="2:00 PM - 3:00 PM">2:00 PM - 3:00 PM</option>
+                <option value="3:00 PM - 4:00 PM">3:00 PM - 4:00 PM</option>
+                <option value="4:00 PM - 5:00 PM">4:00 PM - 5:00 PM</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Meeting Type
+              </label>
+              <select
+                value={meetingForm.meetingType}
+                onChange={(e) => setMeetingForm({ ...meetingForm, meetingType: e.target.value as any })}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground text-sm"
+              >
+                <option value="Google Meet">Google Meet</option>
+                <option value="Zoom">Zoom</option>
+                <option value="Phone Call">Phone Call</option>
+              </select>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={() => {
+                  if (!meetingForm.date || !meetingForm.time) {
+                    toastManager.notify({
+                      title: 'Please fill all fields',
+                      message: 'Date and time are required',
+                      type: 'error',
+                    });
+                    return;
+                  }
+
+                  // Update lead with meeting
+                  const updatedLeads = workflowState.leads.map((lead) => {
+                    if (lead.id === selectedLeadId) {
+                      return {
+                        ...lead,
+                        meeting: {
+                          id: `meeting-${lead.id}`,
+                          leadId: lead.id,
+                          date: meetingForm.date,
+                          time: meetingForm.time,
+                          meetingType: meetingForm.meetingType,
+                          meetingLink: meetingForm.meetingType === 'Phone Call' ? undefined : `https://meet.google.com/${selectedLeadId}`,
+                        },
+                      };
+                    }
+                    return lead;
+                  });
+
+                  workflowManager.setState({ leads: updatedLeads });
+
+                  toastManager.notify({
+                    title: 'Meeting Scheduled',
+                    message: `Meeting scheduled with ${leads.find((l) => l.id === selectedLeadId)?.name} on ${meetingForm.date}`,
+                    type: 'success',
+                  });
+
+                  setShowCalendarModal(false);
+                  setMeetingForm({ date: '', time: '', meetingType: 'Google Meet' });
+                }}
+                className="flex-1 gap-2"
+              >
+                <Calendar className="w-4 h-4" />
+                Schedule Meeting
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowCalendarModal(false);
+                  setMeetingForm({ date: '', time: '', meetingType: 'Google Meet' });
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-6 border-border bg-secondary/50">
+        <h3 className="text-lg font-semibold text-foreground mb-3">Automated Workflow</h3>
+        <ul className="space-y-2 text-sm text-foreground">
+          <li className="flex gap-2">
+            <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            Emails sent to all leads automatically
+          </li>
+          <li className="flex gap-2">
+            <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            Replies monitored and tracked in real-time
+          </li>
+          <li className="flex gap-2">
+            <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            Follow-ups sent automatically to non-respondents
+          </li>
+          <li className="flex gap-2">
+            <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            Your only task: Attend scheduled meetings
+          </li>
+        </ul>
+      </Card>
+    </div>
+  );
+}
