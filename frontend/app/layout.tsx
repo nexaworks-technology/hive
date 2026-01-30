@@ -8,8 +8,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Converge AI - B2B Outreach Platform',
-  description: 'A high-fidelity B2B outreach SaaS platform using a 5-stage pipeline for lead generation and personalized outreach.',
+  title: 'Hive Dashboard',
+  description: 'Lead workflow dashboard with a five-stage pipeline for outreach and follow-up.',
   generator: 'v0.app',
   icons: {
     icon: [

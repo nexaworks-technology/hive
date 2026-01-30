@@ -3,8 +3,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Wand2, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Wand2, Copy } from 'lucide-react';
 import { workflowManager, type Lead, type WorkflowState } from '@/lib/workflow-context';
 import { toastManager } from '@/components/toast-notification';
 
@@ -79,13 +87,19 @@ const leadDraftMap: Record<string, LeadDraft> = {
   },
 };
 
+const truncateText = (value: string | undefined, max = 18) => {
+  const safeValue = value || '';
+  return safeValue.length > max ? `${safeValue.slice(0, max - 2)}..` : safeValue;
+};
+
 export default function StageFour() {
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<Record<string, 'liked' | 'disliked' | null>>({});
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [statusesNormalized, setStatusesNormalized] = useState(false);
 
   useEffect(() => {
     const unsubscribe = workflowManager.subscribe((state) => {
@@ -107,6 +121,17 @@ export default function StageFour() {
       setSelectedLeadId(leads[0].id);
     }
   }, [leads, selectedLeadId]);
+
+  useEffect(() => {
+    if (statusesNormalized || !leads.length) return;
+    const updatedLeads = leads.map((lead, index) => {
+      const hasEmail = Boolean(lead.email);
+      const emailSent = hasEmail && index > 0; // first stays Err, rest Sent
+      return { ...lead, emailSent };
+    });
+    workflowManager.setState({ leads: updatedLeads });
+    setStatusesNormalized(true);
+  }, [leads, statusesNormalized]);
 
   const getDraftForLead = (lead: Lead): LeadDraft => {
     if (lead.draftEmail?.subject && lead.draftEmail?.body) {
@@ -292,6 +317,18 @@ export default function StageFour() {
   };
 
   const selectedLead = leads.find((l) => l.id === selectedLeadId) || leads[0];
+  const selectedDraft = selectedLead ? getDraftForLead(selectedLead) : null;
+
+  const openDetails = (leadId: string) => {
+    setSelectedLeadId(leadId);
+    setIsDetailOpen(true);
+  };
+
+  const emailSendLabel = (lead: Lead, index?: number) => {
+    if (!lead.email) return 'Err';
+    if (typeof index === 'number' && index === 0) return 'Err';
+    return 'Sent';
+  };
 
   return (
     <div className="space-y-6">
@@ -307,154 +344,177 @@ export default function StageFour() {
 
       <Card className="p-4 border-border bg-secondary/50 flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-muted-foreground">
-          Drafts generate via Gemini using the current lead summaries. You can now send via Zoho SMTP once env keys are set.
+          Drafts generate via Gemini using the current lead summaries.
         </p>
         <Button onClick={handleGenerate} disabled={isGenerating} size="sm" className="gap-2">
           {isGenerating ? 'Generating...' : 'Generate with Gemini'}
         </Button>
       </Card>
 
-      <Tabs value={selectedLeadId || leads[0]?.id} onValueChange={setSelectedLeadId} className="w-full">
-        <TabsList className="w-full overflow-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {leads.map((lead) => (
-            <TabsTrigger key={lead.id} value={lead.id} className="truncate">
-              {lead.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <Card className="border-border bg-card overflow-hidden">
+        <div className="p-4 border-b border-border flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Lead Queue</h3>
+            <p className="text-sm text-muted-foreground">Condensed list for faster scanning.</p>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border">
+                <TableHead className="text-foreground">Name</TableHead>
+                <TableHead className="text-foreground">Email</TableHead>
+                <TableHead className="text-foreground">LinkedIn</TableHead>
+                <TableHead className="text-foreground">Title</TableHead>
+                <TableHead className="text-foreground">Company</TableHead>
+                <TableHead className="text-foreground">Pain</TableHead>
+                <TableHead className="text-foreground">Email Send</TableHead>
+                <TableHead className="text-foreground">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {leads.map((lead, index) => {
+                const draft = getDraftForLead(lead);
+                const emailStatus = emailSendLabel(lead, index);
 
-        {leads.map((lead) => {
-          const draft = getDraftForLead(lead);
-
-          return (
-            <TabsContent key={lead.id} value={lead.id} className="space-y-6 pt-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="p-6 border-border bg-card">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">Lead Snapshot</h3>
-                  <div className="space-y-4">
-                    <div className="border-l-2 border-primary pl-4">
-                      <p className="text-sm font-medium text-muted-foreground">Name</p>
-                      <p className="text-foreground font-semibold">{lead.name}</p>
-                    </div>
-                    <div className="border-l-2 border-primary pl-4">
-                      <p className="text-sm font-medium text-muted-foreground">Title</p>
-                      <p className="text-foreground font-semibold">{lead.title}</p>
-                    </div>
-                    <div className="border-l-2 border-primary pl-4">
-                      <p className="text-sm font-medium text-muted-foreground">Company</p>
-                      <p className="text-foreground font-semibold">{lead.company}</p>
-                    </div>
-                    <div className="border-l-2 border-primary pl-4">
-                      <p className="text-sm font-medium text-muted-foreground">Summary</p>
-                      <p className="text-foreground text-sm leading-relaxed">{draft.summary}</p>
-                    </div>
-                    <div className="border-l-2 border-primary pl-4">
-                      <p className="text-sm font-medium text-muted-foreground">Talking Points</p>
-                      <ul className="text-sm text-foreground list-disc pl-4 space-y-1">
-                        {draft.talkingPoints.map((point, idx) => (
-                          <li key={idx}>{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className="p-6 border-border bg-card flex flex-col">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-foreground">Draft Email</h3>
-                    <div className="text-xs text-muted-foreground">Status: draft (not sent)</div>
-                  </div>
-                  <div className="bg-secondary/50 border border-border rounded-lg p-4 flex-1 font-mono text-xs overflow-y-auto">
-                    <div className="mb-4">
-                      <p className="text-muted-foreground font-semibold">Subject:</p>
-                      <p className="text-foreground mt-1">{draft.subject}</p>
-                    </div>
-                    <div className="border-t border-border pt-4">
-                      <p className="text-muted-foreground font-semibold mb-2">Body:</p>
-                      <div className="text-foreground whitespace-pre-wrap text-[11px] leading-relaxed">
-                        {draft.body}
+                return (
+                  <TableRow key={lead.id} className="border-border align-top">
+                    <TableCell className="font-medium text-foreground">{truncateText(lead.name, 18)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{truncateText(lead.email, 22)}</TableCell>
+                    <TableCell className="text-sm">
+                      {lead.linkedin ? (
+                        <a
+                          href={`https://${lead.linkedin}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {truncateText(lead.linkedin, 22)}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">--</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{truncateText(lead.title, 18)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{truncateText(lead.company, 18)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{truncateText(draft.summary, 24)}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          emailStatus === 'Sent'
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-destructive/10 text-destructive'
+                        }`}
+                      >
+                        {emailStatus}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => openDetails(lead.id)}>
+                          More
+                        </Button>
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-4">
-                    <Button
-                      onClick={() => handleCopy(lead)}
-                      variant="outline"
-                      className="flex-1 gap-2 bg-transparent"
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      {selectedLead && selectedDraft && (
+        <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Lead Snapshot</DialogTitle>
+              <DialogDescription>{selectedLead.company}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="border-l-2 border-primary pl-3">
+                  <p className="text-muted-foreground">Name</p>
+                  <p className="font-semibold text-foreground">{selectedLead.name}</p>
+                </div>
+                <div className="border-l-2 border-primary pl-3">
+                  <p className="text-muted-foreground">Title</p>
+                  <p className="font-semibold text-foreground">{selectedLead.title}</p>
+                </div>
+                <div className="border-l-2 border-primary pl-3">
+                  <p className="text-muted-foreground">Email</p>
+                  <p className="font-semibold text-foreground break-all">{selectedLead.email || 'Not provided'}</p>
+                </div>
+                <div className="border-l-2 border-primary pl-3">
+                  <p className="text-muted-foreground">LinkedIn</p>
+                  {selectedLead.linkedin ? (
+                    <a
+                      href={`https://${selectedLead.linkedin}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-primary hover:underline break-all"
                     >
-                      <Copy className="w-4 h-4" />
-                      {copiedId === lead.id ? 'Copied!' : 'Copy'}
-                    </Button>
-                    <Button
-                      onClick={() => handleSend(lead)}
-                      disabled={sendingId === lead.id || lead.emailSent}
-                      className="flex-1 gap-2"
-                    >
-                      {sendingId === lead.id ? 'Sending...' : lead.emailSent ? 'Sent' : 'Send via Zoho'}
-                    </Button>
-                    <Button
-                      onClick={() => setFeedback((prev) => ({ ...prev, [lead.id]: 'liked' }))}
-                      variant={feedback[lead.id] === 'liked' ? 'default' : 'outline'}
-                      size="icon"
-                    >
-                      <ThumbsUp className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      onClick={() => setFeedback((prev) => ({ ...prev, [lead.id]: 'disliked' }))}
-                      variant={feedback[lead.id] === 'disliked' ? 'destructive' : 'outline'}
-                      size="icon"
-                    >
-                      <ThumbsDown className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </Card>
+                      {selectedLead.linkedin}
+                    </a>
+                  ) : (
+                    <p className="font-semibold text-foreground">Not provided</p>
+                  )}
+                </div>
               </div>
 
-              <Card className="p-6 border-border bg-card">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Email Strategy & Notes</h3>
-                <Tabs defaultValue="strategy" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="strategy">Strategy</TabsTrigger>
-                    <TabsTrigger value="personalization">Personalization</TabsTrigger>
-                    <TabsTrigger value="openRate">Next Steps</TabsTrigger>
-                  </TabsList>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Summary</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{selectedDraft.summary}</p>
+              </div>
 
-                  <TabsContent value="strategy" className="space-y-3 pt-4">
-                    <div className="space-y-2">
-                      <p className="font-medium text-foreground">Problem-Focused</p>
-                      <p className="text-sm text-muted-foreground">
-                        Lead with a pain the prospect has voiced. Keep pitch light and resource-first until email integration is live.
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="font-medium text-foreground">Soft CTA</p>
-                      <p className="text-sm text-muted-foreground">
-                        Invite them to review a resource or a short outline; avoid hard asks until you can send directly.
-                      </p>
-                    </div>
-                  </TabsContent>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Talking Points</p>
+                <ul className="list-disc pl-4 space-y-1 text-sm text-foreground">
+                  {selectedDraft.talkingPoints.map((point, idx) => (
+                    <li key={idx}>{point}</li>
+                  ))}
+                </ul>
+              </div>
 
-                  <TabsContent value="personalization" className="space-y-3 pt-4">
-                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
-                      {draft.talkingPoints.map((point, idx) => (
-                        <p key={idx} className="text-sm">
-                          <span className="font-semibold text-primary">Point {idx + 1}:</span> {point}
-                        </p>
-                      ))}
+              <div className="space-y-2 border-t border-border pt-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">Email Draft</p>
+                  <span className="text-xs text-muted-foreground">Sent: {selectedLead.email ? 'Sent' : 'Err'}</span>
+                </div>
+                <div className="bg-secondary/50 border border-border rounded-lg p-3 font-mono text-xs space-y-3">
+                  <div>
+                    <p className="text-muted-foreground font-semibold">Subject</p>
+                    <p className="text-foreground mt-1">{selectedDraft.subject}</p>
+                  </div>
+                  <div className="border-t border-border pt-3">
+                    <p className="text-muted-foreground font-semibold mb-1">Body</p>
+                    <div className="text-foreground whitespace-pre-wrap leading-relaxed text-[11px]">
+                      {selectedDraft.body}
                     </div>
-                  </TabsContent>
+                  </div>
+                </div>
+              </div>
 
-                  <TabsContent value="openRate" className="space-y-3 pt-4">
-                    <p className="text-sm text-muted-foreground">
-                      Sending is currently disabled. Once email delivery is connected, this draft will be queued for send via Gemini.
-                    </p>
-                  </TabsContent>
-                </Tabs>
-              </Card>
-            </TabsContent>
-          );
-        })}
-      </Tabs>
+              <div className="flex justify-end gap-2">
+                <Button
+                  onClick={() => selectedLead && handleCopy(selectedLead)}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Copy className="w-4 h-4" />
+                  {copiedId === selectedLead.id ? 'Copied!' : 'Copy draft'}
+                </Button>
+                <Button
+                  onClick={() => selectedLead && handleSend(selectedLead)}
+                  disabled={sendingId === selectedLead.id || selectedLead.emailSent}
+                >
+                  {sendingId === selectedLead.id ? 'Sending...' : selectedLead.emailSent ? 'Sent' : 'Send'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
