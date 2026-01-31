@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y gcc libpq-dev && rm -rf /var/lib/apt/li
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers (huge download, optional for dev speed but needed for scraping)
-# RUN playwright install --with-deps chromium
+# Install Playwright browsers
+RUN playwright install --with-deps chromium
 
 COPY . .
 

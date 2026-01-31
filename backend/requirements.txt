@@ -12,3 +12,10 @@ beautifulsoup4
 playwright
 openai
 langchain
+aiosmtplib
+google-generativeai
+langgraph
+google-api-python-client
+tavily-python
+ddgs
+googlesearch-python
