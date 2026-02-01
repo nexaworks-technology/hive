@@ -16,6 +16,8 @@ import { workflowManager, type WorkflowState, type Lead, type Meeting } from '@/
 import { toastManager } from '@/components/toast-notification';
 import { Clock } from 'lucide-react'; // Import Clock component
 
+type ReplySentiment = 'Positive' | 'Negative';
+
 const sentimentColors = {
   'Very Interested': 'bg-green-100 text-green-800',
   'Interested': 'bg-yellow-100 text-yellow-800',
@@ -32,6 +34,7 @@ export default function StageFive() {
     time: '',
     meetingType: 'Google Meet' as const,
   });
+  const [replySendingId, setReplySendingId] = useState<string | null>(null);
 
   const persistenceLeads = workflowState?.leads.filter((lead) => !lead.replied) || []; // Define persistenceLeads variable
   const hotLeads = workflowState?.leads.filter((lead) => lead.replied && lead.sentiment === 'Very Interested') || []; // Define hotLeads variable
@@ -100,6 +103,98 @@ export default function StageFive() {
       intervals.forEach(clearTimeout);
     };
   }, [workflowState?.emailsDrafted]);
+
+  const buildReplyDraft = (lead: Lead, sentiment: ReplySentiment) => {
+    const firstName = lead.name.split(' ')[0] || 'there';
+
+    if (sentiment === 'Positive') {
+      const subject = 'Great to hear it — pick a time';
+      const body = `Hi ${firstName},
+
+Great to hear that you’re interested. Let’s lock a quick sync (15-20 mins):
+- Tomorrow, 10:00 AM
+- Tomorrow, 2:00 PM
+- Day after tomorrow, 11:00 AM
+
+Reply with the slot that works best (or share your preferred time) and I’ll send a Meet link right away.`;
+      return { subject, body };
+    }
+
+    const subject = 'Thanks for letting me know';
+    const body = `Hi ${firstName},
+
+Appreciate the quick response. I’ll pause outreach for now. If priorities change or you want a 10-minute rundown, I’m happy to help.`;
+    return { subject, body };
+  };
+
+  const handleSendReply = async (lead: Lead, sentiment: ReplySentiment) => {
+    if (replySendingId) return;
+    setReplySendingId(lead.id);
+
+    const draft = buildReplyDraft(lead, sentiment);
+    const loadingToastId = toastManager.notify({
+      title: 'Sending reply...',
+      message: `Delivering to ${lead.email}`,
+      type: 'loading',
+      duration: 0,
+    });
+
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: lead.email,
+          subject: draft.subject,
+          body: draft.body,
+          fromName: 'Nexaworks',
+        }),
+      });
+
+      if (!res.ok) {
+        const details = await res.json().catch(() => ({} as any));
+        const parts = [details.error || 'Failed to send reply'];
+        throw new Error(parts.join(' | '));
+      }
+
+      const updatedLeads = workflowState?.leads.map((l) =>
+        l.id === lead.id
+          ? { ...l, replied: true, replySentiment: sentiment, replyText: draft.body }
+          : l
+      ) || [];
+
+      const state = workflowManager.getState();
+      const updatedSent = [
+        ...(state.sentEmails || []),
+        {
+          id: `reply-${Date.now()}-${lead.id}`,
+          leadId: lead.id,
+          name: lead.name,
+          company: lead.company,
+          email: lead.email,
+          subject: draft.subject,
+          sentAt: new Date().toISOString(),
+        },
+      ];
+
+      workflowManager.setState({ leads: updatedLeads, sentEmails: updatedSent });
+
+      toastManager.notify({
+        title: 'Reply sent',
+        message: `Sent to ${lead.email}.`,
+        type: 'success',
+      });
+    } catch (err) {
+      toastManager.notify({
+        title: 'Reply failed',
+        message: (err as Error).message || 'Unexpected error',
+        type: 'error',
+      });
+    } finally {
+      if (loadingToastId) toastManager.remove(loadingToastId);
+      setReplySendingId(null);
+    }
+  };
 
   if (!workflowState?.leads.length) {
     return (
@@ -237,25 +332,38 @@ export default function StageFive() {
                     {lead.meeting ? lead.meeting.time : '-'}
                   </TableCell>
                   <TableCell>
-                    {lead.meeting ? (
-                      <Button size="sm" className="gap-2 bg-accent/10 text-accent hover:bg-accent/20" variant="ghost">
-                        <Video className="w-3 h-3" />
-                        Join
-                      </Button>
-                    ) : lead.replied ? (
-                      <Button
-                        onClick={() => {
-                          setSelectedLeadId(lead.id);
-                          setShowCalendarModal(true);
-                        }}
-                        size="sm"
-                        variant="outline"
-                        className="gap-2"
-                      >
-                        <Calendar className="w-3 h-3" />
-                        Schedule
-                      </Button>
-                    ) : null}
+                    <div className="flex flex-col gap-2">
+                      {lead.meeting ? (
+                        <Button size="sm" className="gap-2 bg-accent/10 text-accent hover:bg-accent/20" variant="ghost">
+                          <Video className="w-3 h-3" />
+                          Join
+                        </Button>
+                      ) : lead.replied ? (
+                        <Button
+                          onClick={() => {
+                            setSelectedLeadId(lead.id);
+                            setShowCalendarModal(true);
+                          }}
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                        >
+                          <Calendar className="w-3 h-3" />
+                          Schedule
+                        </Button>
+                      ) : null}
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSendReply(lead, 'Positive')}
+                          disabled={replySendingId === lead.id}
+                        >
+                          {replySendingId === lead.id ? 'Sending...' : 'Send slots reply'}
+                        </Button>
+                      </div>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

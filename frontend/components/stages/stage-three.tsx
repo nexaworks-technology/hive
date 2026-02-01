@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { workflowManager, type Lead } from '@/lib/workflow-context';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -14,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Zap, Play, Square } from 'lucide-react';
 
-interface Lead {
+interface ScrapedLead {
   id: string;
   name: string;
   title: string;
@@ -24,13 +25,13 @@ interface Lead {
   enrichmentStatus: string;
 }
 
-const mockLeads: Lead[] = [
+const mockLeads: ScrapedLead[] = [
   {
     id: '1',
     name: 'Sarah Johnson',
     title: 'Lead Generation Manager',
     company: 'Phoenix Digital',
-    email: 'sarah@phoenixdigital.com',
+    email: 'pavanfg1@gmail.com',
     linkedin: 'linkedin.com/in/sarahjohnson',
     enrichmentStatus: 'Complete',
   },
@@ -39,7 +40,7 @@ const mockLeads: Lead[] = [
     name: 'Michael Chen',
     title: 'Operations Director',
     company: 'Growth Catalyst Ltd',
-    email: 'mchen@growthcatalyst.co.uk',
+    email: 'pavanbabar319@gmail.com',
     linkedin: 'linkedin.com/in/michaelchen',
     enrichmentStatus: 'In Progress',
   },
@@ -48,7 +49,7 @@ const mockLeads: Lead[] = [
     name: 'Emma Williams',
     title: 'Head of Sales',
     company: 'Outreach Pro',
-    email: 'emma@outreachpro.io',
+    email: 'testppb013@gmail.com',
     linkedin: 'linkedin.com/in/emmawilliams',
     enrichmentStatus: 'Complete',
   },
@@ -57,15 +58,69 @@ const mockLeads: Lead[] = [
     name: 'James Rodriguez',
     title: 'Business Development',
     company: 'London Lead Systems',
-    email: 'james@londonleads.com',
+    email: 'pavan@nexaworks.tech',
     linkedin: 'linkedin.com/in/jamesrodriguez',
     enrichmentStatus: 'Pending',
   },
+  {
+    id: '5',
+    name: 'Lisa Park',
+    title: 'Sales Director',
+    company: 'DataDrive Solutions',
+    email: 'sahil@nexaworks.tech',
+    linkedin: 'linkedin.com/in/lisapark',
+    enrichmentStatus: 'Complete',
+  },
+  {
+    id: '6',
+    name: 'David Turner',
+    title: 'VP Growth',
+    company: 'Scale Intelligence',
+    email: 'pavanfg1@gmail.com',
+    linkedin: 'linkedin.com/in/davidturner',
+    enrichmentStatus: 'In Progress',
+  },
 ];
+
+const scrapedSummaries: Record<string, string> = {
+  '1': 'Lead gen manager concerned about lead quality consistency.',
+  '2': 'Ops director aiming for predictable pipeline throughput.',
+  '3': 'Sales lead wants better reply rates without extra manual work.',
+  '4': 'BD rep balancing volume and personalization speed.',
+  '5': 'Data-minded sales director focused on attributable pipeline.',
+  '6': 'Growth VP looking for repeatable, de-risked experiments.',
+};
 
 export default function StageThree() {
   const [isScraperRunning, setIsScraperRunning] = useState(false);
   const [scrapingProgress, setScrapingProgress] = useState(45);
+  const [hasDispatchedLeads, setHasDispatchedLeads] = useState(false);
+
+  const dispatchLeadsToWorkflow = () => {
+    if (hasDispatchedLeads) return;
+
+    const enriched: Lead[] = mockLeads.map((lead, index) => ({
+      id: lead.id,
+      name: lead.name,
+      title: lead.title,
+      company: lead.company,
+      email: lead.email,
+      linkedin: lead.linkedin,
+      emailSent: false,
+      replied: false,
+      followupCount: 0,
+      summary: scrapedSummaries[lead.id] || 'Summary pending.',
+      talkingPoints: [],
+    }));
+
+    workflowManager.setState({
+      leads: enriched,
+      scrapingComplete: true,
+      emailsDrafted: false,
+      currentStage: 'stage-4',
+    });
+    setHasDispatchedLeads(true);
+  };
 
   const handleStartScraping = () => {
     setIsScraperRunning(true);
@@ -75,6 +130,7 @@ export default function StageThree() {
         if (prev >= 100) {
           clearInterval(interval);
           setIsScraperRunning(false);
+          dispatchLeadsToWorkflow();
           return 100;
         }
         return prev + Math.random() * 15;
@@ -137,6 +193,9 @@ export default function StageThree() {
             <div>{'>'} Fetching contact information...</div>
             {isScraperRunning && (
               <div className="animate-pulse">{'>'} Processing leads...</div>
+            )}
+            {!isScraperRunning && hasDispatchedLeads && (
+              <div className="text-primary">{'>'} Leads pushed to email stage</div>
             )}
           </div>
         </div>

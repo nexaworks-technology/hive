@@ -29,67 +29,139 @@ const fallbackLeads: Lead[] = [
     name: 'Sample Prospect',
     title: 'Growth Lead',
     company: 'Atlas Labs',
-    email: 'sample@atlaslabs.io',
+    email: 'sahil@nexaworks.tech',
     linkedin: 'linkedin.com/in/sample',
     emailSent: false,
     replied: false,
     followupCount: 0,
     summary: 'Looking for steadier outbound performance; open to concise pilots.',
     talkingPoints: ['Keep pitch light', 'Offer a low-risk pilot', 'Share one data point'],
-    draftEmail: {
-      subject: 'Quick idea to stabilize your outbound',
-      body: `Hi there,\n\nNoticed Atlas is tightening outbound. A small tweak—intent signal + 2-step follow-up—lifted meetings for a similar team.\n\nIf helpful, I can share the 3-step checklist. Want it?`,
-      readyToSend: false,
-    },
   },
 ];
 
-const leadDraftMap: Record<string, LeadDraft> = {
-  '1': {
-    summary: 'Lead gen manager concerned about lead quality consistency.',
+const demoLeads: Lead[] = [
+  {
+    id: '1',
+    name: 'Sarah Johnson',
+    title: 'Lead Generation Manager',
+    company: 'Phoenix Digital',
+    email: 'pavanfg1@gmail.com',
+    linkedin: 'linkedin.com/in/sarahjohnson',
+    emailSent: false,
+    replied: false,
+    followupCount: 0,
+    summary: 'Runs lead gen at a boutique agency; recently shared concerns about lead quality consistency.',
     talkingPoints: [
-      'Reference her post on lead quality',
-      'Suggest validation and scoring',
-      'Offer to share a checklist, not a pitch',
+      'Reference her LinkedIn post on lead quality',
+      'Offer ideas on validation and scoring',
+      'Keep tone consultative, not salesy',
     ],
-    subject: 'Quick thought on keeping lead quality consistent',
-    body: `Hi Sarah,\n\nSaw your note about lead quality swings. We helped a 25-person agency stabilize quality by adding real-time validation + light enrichment before handoff. Happy to share the checklist they use if helpful.\n\nWorth a 10-min walkthrough?`,
   },
-  '2': {
-    summary: 'Ops director aiming for predictable pipeline throughput.',
-    talkingPoints: ['Tie to throughput and predictability', 'Share one process tweak', 'Invite him to a short map review'],
-    subject: 'Keeping your pipeline predictable this quarter',
-    body: `Hi Michael,\n\nYou mentioned wanting a steadier pipeline. We usually get there by tightening handoffs: light scoring + a two-step follow-up sequence tied to buyer signals.\n\nI can share a 1-page ops map that cut variance for a 40-person team—want a copy?`,
+  {
+    id: '2',
+    name: 'Michael Chen',
+    title: 'Operations Director',
+    company: 'Growth Catalyst Ltd',
+    email: 'pavanbabar319@gmail.com',
+    linkedin: 'linkedin.com/in/michaelchen',
+    emailSent: false,
+    replied: false,
+    followupCount: 0,
+    summary: 'Ops lead focused on throughput; looking for predictable pipeline health.',
+    talkingPoints: [
+      'Mention ops throughput and predictable pipeline',
+      'Offer one concrete process tweak',
+      'Invite him to review a short system map',
+    ],
   },
-  '3': {
-    summary: 'Sales lead wants better reply rates without extra manual work.',
-    talkingPoints: ['Improve replies without more headcount', 'Point to a similar team win', 'Offer a ready opener'],
-    subject: 'One tweak that lifted replies 18% for a peer team',
-    body: `Hi Emma,\n\nA sales org we support bumped replies 18% by pairing intent signals with a lighter-touch follow-up. No extra reps—just tighter triggers.\n\nIf useful, I can share the exact opener + triggers they used. Interested?`,
+  {
+    id: '3',
+    name: 'Emma Williams',
+    title: 'Head of Sales',
+    company: 'Outreach Pro',
+    email: 'testppb013@gmail.com',
+    linkedin: 'linkedin.com/in/emmawilliams',
+    emailSent: false,
+    replied: false,
+    followupCount: 0,
+    summary: 'Sales leader aiming to lift reply rates without ballooning manual work.',
+    talkingPoints: [
+      'Show how to improve replies without extra headcount',
+      'Point to a similar sales org win',
+      'Offer a ready-to-use opener',
+    ],
   },
-  '4': {
-    summary: 'BD rep balancing volume and personalization speed.',
-    talkingPoints: ['Balance speed with specificity', 'Share a reusable template', 'Offer a small test on 10 contacts'],
-    subject: 'Faster personalization for your next 10 prospects',
-    body: `Hi James,\n\nYou called out wanting quick personalization at scale. We built a short pattern: enrich → 2-sentence hook → light CTA. Keeps speed while feeling specific.\n\nWant me to set it up on 10 of your contacts so you can see the lift?`,
+  {
+    id: '4',
+    name: 'James Rodriguez',
+    title: 'Business Development',
+    company: 'London Lead Systems',
+    email: 'pavan@nexaworks.tech',
+    linkedin: 'linkedin.com/in/jamesrodriguez',
+    emailSent: false,
+    replied: false,
+    followupCount: 0,
+    summary: 'BD rep juggling volume; wants outreach that feels personal but is fast.',
+    talkingPoints: [
+      'Lean on speed + personalization balance',
+      'Share a template he can reuse',
+      'Offer a quick test on 10 contacts',
+    ],
   },
-  '5': {
-    summary: 'Data-minded sales director focused on attribution and pipeline.',
-    talkingPoints: ['Emphasize measurable impact', 'Call out data cleanliness', 'Propose a small AB test'],
-    subject: 'Making attribution cleaner on your outbound',
-    body: `Hi Lisa,\n\nMost outbound falls down at attribution. We add a light enrichment + UTM discipline that lets sales see which plays drive meetings.\n\nIf you want, I can share the mini playbook and a 2-week AB test outline.`,
+  {
+    id: '5',
+    name: 'Lisa Park',
+    title: 'Sales Director',
+    company: 'DataDrive Solutions',
+    email: 'sahil@nexaworks.tech',
+    linkedin: 'linkedin.com/in/lisapark',
+    emailSent: false,
+    replied: false,
+    followupCount: 0,
+    summary: 'Data-minded director; cares about attributable pipeline.',
+    talkingPoints: [
+      'Emphasize measurable pipeline contribution',
+      'Reference data cleanliness for attribution',
+      'Suggest a small AB test',
+    ],
   },
-  '6': {
-    summary: 'Growth VP wants repeatable, low-risk outbound plays.',
-    talkingPoints: ['Highlight repeatability', 'Offer a low-risk pilot', 'Share a benchmark result'],
-    subject: 'A low-risk pilot to harden your outbound',
-    body: `Hi David,\n\nYou mentioned wanting repeatable plays. A growth team we worked with hardened their outbound by piloting a short intent-enriched sequence—reproducible, measurable.\n\nIf you want the 3-step pilot plan, I can send it over and set it up on a small slice first.`,
+  {
+    id: '6',
+    name: 'David Turner',
+    title: 'VP Growth',
+    company: 'Scale Intelligence',
+    email: 'pavanfg1@gmail.com',
+    linkedin: 'linkedin.com/in/davidturner',
+    emailSent: false,
+    replied: false,
+    followupCount: 0,
+    summary: 'Growth lead focused on repeatable plays; open to experiments that de-risk.',
+    talkingPoints: [
+      'Highlight repeatability and experiment design',
+      'Offer a low-risk pilot',
+      'Share a benchmark result',
+    ],
   },
-};
+];
 
 const truncateText = (value: string | undefined, max = 18) => {
   const safeValue = value || '';
   return safeValue.length > max ? `${safeValue.slice(0, max - 2)}..` : safeValue;
+};
+
+const buildFallbackDraft = (lead: Lead): LeadDraft => {
+  const name = lead.name.split(' ')[0] || 'there';
+  const summary = lead.summary || 'Prospect with recent activity worth a tailored note.';
+  const points = lead.talkingPoints && lead.talkingPoints.length
+    ? lead.talkingPoints.join('; ')
+    : 'Keep it short, mention one pain, offer a quick next step.';
+
+  return {
+    subject: `Quick idea for ${lead.company}`,
+    body: `Hi ${name},\n\nNoticed ${lead.company} and your role as ${lead.title}. ${summary}\n\nA simple tweak could help: ${points}.\n\nIf helpful, I can share a 3-step outline. Interested?`,
+    summary,
+    talkingPoints: lead.talkingPoints || [],
+  };
 };
 
 export default function StageFour() {
@@ -99,7 +171,9 @@ export default function StageFour() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [statusesNormalized, setStatusesNormalized] = useState(false);
+  const [autoGenerateTriggered, setAutoGenerateTriggered] = useState(false);
+  const [autoSendTriggered, setAutoSendTriggered] = useState(false);
+  const [autoDemoLoaded, setAutoDemoLoaded] = useState(false);
 
   useEffect(() => {
     const unsubscribe = workflowManager.subscribe((state) => {
@@ -113,8 +187,37 @@ export default function StageFour() {
 
   const leads: Lead[] = useMemo(() => {
     if (workflowState?.leads?.length) return workflowState.leads;
-    return fallbackLeads;
+    return demoLeads;
   }, [workflowState?.leads]);
+
+  const loadDemoLeads = () => {
+    const leadsWithDrafts = demoLeads.map((lead) => ({
+      ...lead,
+      draftEmail: buildFallbackDraft(lead),
+    }));
+
+    workflowManager.setState({
+      leads: leadsWithDrafts,
+      emailsDrafted: true,
+      currentStage: 'stage-4',
+    });
+
+    toastManager.notify({
+      title: 'Loaded provided leads',
+      message: 'Using your provided emails with placeholder drafts.',
+      type: 'success',
+    });
+  };
+
+  useEffect(() => {
+    if (autoDemoLoaded) return;
+    if (!workflowState?.leads?.length) {
+      setAutoDemoLoaded(true);
+      loadDemoLeads();
+    }
+  }, [workflowState?.leads?.length, autoDemoLoaded]);
+
+  const sentEmails = workflowState?.sentEmails || [];
 
   useEffect(() => {
     if (!selectedLeadId && leads.length) {
@@ -123,15 +226,31 @@ export default function StageFour() {
   }, [leads, selectedLeadId]);
 
   useEffect(() => {
-    if (statusesNormalized || !leads.length) return;
-    const updatedLeads = leads.map((lead, index) => {
-      const hasEmail = Boolean(lead.email);
-      const emailSent = hasEmail && index > 0; // first stays Err, rest Sent
-      return { ...lead, emailSent };
+    if (!leads.length || workflowState?.emailsDrafted || autoGenerateTriggered) return;
+    setAutoGenerateTriggered(true);
+    handleGenerate().catch((err) => {
+      console.error('Auto-generate failed', err);
+      setAutoGenerateTriggered(false);
     });
-    workflowManager.setState({ leads: updatedLeads });
-    setStatusesNormalized(true);
-  }, [leads, statusesNormalized]);
+  }, [leads.length, workflowState?.emailsDrafted, autoGenerateTriggered]);
+
+  useEffect(() => {
+    if (!workflowState?.emailsDrafted || autoSendTriggered) return;
+    setAutoSendTriggered(true);
+
+    const sendAll = async () => {
+      for (const lead of leads) {
+        if (!lead.emailSent && lead.email && !lead.id.startsWith('fallback')) {
+          await handleSend(lead);
+        }
+      }
+    };
+
+    sendAll().catch((err) => {
+      console.error('Auto-send failed', err);
+      setAutoSendTriggered(false);
+    });
+  }, [workflowState?.emailsDrafted, autoSendTriggered, leads]);
 
   const getDraftForLead = (lead: Lead): LeadDraft => {
     if (lead.draftEmail?.subject && lead.draftEmail?.body) {
@@ -141,109 +260,46 @@ export default function StageFour() {
         summary:
           lead.summary ||
           'Concise summary not provided. Draft kept lightweight for review before sending.',
-        talkingPoints:
-          lead.talkingPoints || [
-            'Reference a recent activity or pain point',
-            'Offer a short, no-pitch resource',
-            'Close with an easy next step',
-          ],
+        talkingPoints: lead.talkingPoints || [],
       };
     }
-
-    const mapped = leadDraftMap[lead.id];
-    if (mapped) return mapped;
 
     return {
       summary:
         lead.summary ||
-        'Concise summary not provided. Draft kept lightweight for review before sending.',
-      talkingPoints:
-        lead.talkingPoints || [
-          'Reference a recent activity or pain point',
-          'Offer a short, no-pitch resource',
-          'Close with an easy next step',
-        ],
-      subject: lead.draftEmail?.subject || 'Quick idea for your team',
-      body:
-        lead.draftEmail?.body ||
-        `Hi ${lead.name.split(' ')[0] || 'there'},\n\nSharing a quick idea tailored to ${lead.company}. Happy to adjust once you review.`,
+        'Concise summary not provided. Draft uses placeholder content while Gemini is paused.',
+      talkingPoints: lead.talkingPoints || [],
+      subject: '',
+      body: '',
     };
   };
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     const loadingToastId = toastManager.notify({
-      title: 'Generating drafts...',
-      message: 'Calling Gemini to create personalized emails.',
+      title: 'Preparing placeholder drafts...',
+      message: 'Gemini is paused; creating simple drafts locally.',
       type: 'loading',
       duration: 0,
     });
-    try {
-      const payload = {
-        targetAudience: workflowState?.targetAudience || '',
-        additionalContext: workflowState?.additionalContext || '',
-        leads: leads.map((lead) => ({
-          id: lead.id,
-          name: lead.name,
-          title: lead.title,
-          company: lead.company,
-          summary: lead.summary || 'No summary provided',
-          talkingPoints: lead.talkingPoints || [],
-        })),
-      };
 
-      const res = await fetch('/api/generate-drafts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+    const updatedLeads = leads.map((lead) => ({
+      ...lead,
+      draftEmail: buildFallbackDraft(lead),
+    }));
 
-      if (!res.ok) {
-        const details = await res.json().catch(() => ({} as any));
-        const parts = [details.error || 'Failed to generate drafts'];
-        if (details.status) parts.push(`status ${details.status}`);
-        if (details.details) parts.push(String(details.details).slice(0, 200));
-        throw new Error(parts.join(' | '));
-      }
+    workflowManager.setState({ leads: updatedLeads, emailsDrafted: true, currentStage: 'stage-4' });
 
-      const data = (await res.json()) as {
-        drafts?: { id: string; subject: string; body: string }[];
-        details?: string;
-      };
-      const drafts = data.drafts || [];
+    toastManager.notify({
+      title: 'Drafts ready',
+      message: 'Using placeholder drafts while Gemini is paused.',
+      type: 'success',
+    });
 
-      const updatedLeads = leads.map((lead) => {
-        const draft = drafts.find((d) => d.id === lead.id);
-        if (!draft) return lead;
-        return {
-          ...lead,
-          draftEmail: {
-            subject: draft.subject,
-            body: draft.body,
-            readyToSend: false,
-          },
-        };
-      });
-
-      workflowManager.setState({ leads: updatedLeads, emailsDrafted: true, currentStage: 'stage-4' });
-
-      toastManager.notify({
-        title: 'Drafts ready',
-        message: 'Gemini generated drafts. Review before sending.',
-        type: 'success',
-      });
-    } catch (err) {
-      toastManager.notify({
-        title: 'Draft generation failed',
-        message: (err as Error).message || 'Unexpected error',
-        type: 'error',
-      });
-    } finally {
-      if (loadingToastId) {
-        toastManager.remove(loadingToastId);
-      }
-      setIsGenerating(false);
+    if (loadingToastId) {
+      toastManager.remove(loadingToastId);
     }
+    setIsGenerating(false);
   };
 
   const handleCopy = (lead: Lead) => {
@@ -270,6 +326,10 @@ export default function StageFour() {
     }
 
     const draft = getDraftForLead(lead);
+    if (!draft.subject || !draft.body) {
+      toastManager.notify({ title: 'Draft missing', message: 'Generate drafts before sending.', type: 'error' });
+      return;
+    }
     setSendingId(lead.id);
     const loadingToastId = toastManager.notify({
       title: 'Sending...',
@@ -297,7 +357,21 @@ export default function StageFour() {
       }
 
       const updatedLeads = leads.map((l) => (l.id === lead.id ? { ...l, emailSent: true } : l));
-      workflowManager.setState({ leads: updatedLeads, currentStage: 'stage-5' });
+      const state = workflowManager.getState();
+      const updatedSent = [
+        ...(state.sentEmails || []),
+        {
+          id: `send-${Date.now()}-${lead.id}`,
+          leadId: lead.id,
+          name: lead.name,
+          company: lead.company,
+          email: lead.email,
+          subject: draft.subject,
+          sentAt: new Date().toISOString(),
+        },
+      ];
+
+      workflowManager.setState({ leads: updatedLeads, currentStage: 'stage-5', sentEmails: updatedSent });
 
       toastManager.notify({
         title: 'Email sent',
@@ -338,16 +412,19 @@ export default function StageFour() {
           <h2 className="text-2xl font-bold text-foreground">The Spear</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          Review AI-drafted outreach emails. Sending is disabled until email is integrated.
+          Review placeholder outreach emails while Gemini is paused. Sending flows through SMTP.
         </p>
       </div>
 
       <Card className="p-4 border-border bg-secondary/50 flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-muted-foreground">
-          Drafts generate via Gemini using the current lead summaries.
+          Drafts use simple placeholder text until Gemini is re-enabled.
         </p>
         <Button onClick={handleGenerate} disabled={isGenerating} size="sm" className="gap-2">
-          {isGenerating ? 'Generating...' : 'Generate with Gemini'}
+          {isGenerating ? 'Generating...' : 'Generate placeholders'}
+        </Button>
+        <Button onClick={loadDemoLeads} variant="outline" size="sm" className="gap-2">
+          Load provided leads
         </Button>
       </Card>
 
@@ -422,6 +499,45 @@ export default function StageFour() {
             </TableBody>
           </Table>
         </div>
+      </Card>
+
+      <Card className="p-4 border-border bg-secondary/50">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-foreground">Recently Sent</h3>
+          <span className="text-xs text-muted-foreground">Live during this session</span>
+        </div>
+        {sentEmails.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No emails sent yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border">
+                  <TableHead className="text-foreground">Name</TableHead>
+                  <TableHead className="text-foreground">Email</TableHead>
+                  <TableHead className="text-foreground">Company</TableHead>
+                  <TableHead className="text-foreground">Subject</TableHead>
+                  <TableHead className="text-foreground">Sent</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sentEmails.slice().reverse().slice(0, 6).map((entry) => (
+                  <TableRow key={entry.id} className="border-border">
+                    <TableCell className="font-medium text-foreground">{truncateText(entry.name, 22)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{truncateText(entry.email, 24)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{truncateText(entry.company, 18)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm truncate max-w-[220px]">
+                      {entry.subject || '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {new Date(entry.sentAt).toLocaleTimeString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Card>
 
       {selectedLead && selectedDraft && (

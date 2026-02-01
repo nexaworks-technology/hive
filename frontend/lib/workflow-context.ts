@@ -26,6 +26,8 @@ export interface Lead {
     body: string;
     readyToSend?: boolean;
   };
+  replySentiment?: 'Positive' | 'Negative';
+  replyText?: string;
   sentiment?: 'Very Interested' | 'Interested' | 'Maybe' | 'Not Interested';
   meeting?: Meeting;
 }
@@ -46,6 +48,16 @@ export interface Campaign {
   emailsSent: number;
   repliesReceived: number;
   meetingsScheduled: number;
+}
+
+export interface SentEmailRecord {
+  id: string;
+  leadId: string;
+  name: string;
+  company: string;
+  email: string;
+  subject?: string;
+  sentAt: string;
 }
 
 export interface WorkflowState {
@@ -70,6 +82,9 @@ export interface WorkflowState {
   emailsDrafted: boolean;
   currentStage: 'dashboard' | 'stage-1' | 'stage-2' | 'stage-3' | 'stage-4' | 'stage-5' | 'history';
 
+  // Activity
+  sentEmails: SentEmailRecord[];
+
   // History
   campaignHistory: Campaign[];
 }
@@ -82,6 +97,7 @@ export const initialWorkflowState: WorkflowState = {
   leads: [],
   emailsDrafted: false,
   currentStage: 'dashboard',
+  sentEmails: [],
   campaignHistory: [],
 };
 

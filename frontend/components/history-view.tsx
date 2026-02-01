@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { workflowManager, type WorkflowState, type Lead } from '@/lib/workflow-context';
-import { Clock, Mail, MessageCircle, Repeat2, Linkedin } from 'lucide-react';
+import { Clock, Mail, MessageCircle, Repeat2, Linkedin, Send } from 'lucide-react';
 
 export default function HistoryView() {
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
@@ -29,6 +29,8 @@ export default function HistoryView() {
     ...workflowState.leads,
     ...workflowState.campaignHistory.flatMap((campaign) => campaign.leads),
   ];
+
+  const sentLog = workflowState.sentEmails || [];
 
   if (allLeads.length === 0) {
     return (
@@ -52,6 +54,45 @@ export default function HistoryView() {
         <h1 className="text-3xl font-bold text-foreground">History</h1>
         <p className="text-sm text-muted-foreground mt-2">View all past leads and campaigns</p>
       </div>
+
+      <Card className="p-6 border-border bg-secondary/50">
+        <div className="flex items-center gap-2 mb-4">
+          <Send className="w-4 h-4 text-primary" />
+          <h3 className="text-lg font-semibold text-foreground">Recent Sends</h3>
+        </div>
+        {sentLog.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No emails sent yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-foreground">Name</TableHead>
+                  <TableHead className="text-foreground">Email</TableHead>
+                  <TableHead className="text-foreground">Company</TableHead>
+                  <TableHead className="text-foreground">Subject</TableHead>
+                  <TableHead className="text-foreground">Sent At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sentLog.slice().reverse().map((entry) => (
+                  <TableRow key={entry.id} className="border-border">
+                    <TableCell className="font-medium text-foreground">{entry.name}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{entry.email}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{entry.company}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm truncate max-w-[260px]">
+                      {entry.subject || '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {new Date(entry.sentAt).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </Card>
 
       <Card className="p-6 border-border bg-card">
         <h3 className="text-lg font-semibold text-foreground mb-4">All Leads ({allLeads.length})</h3>
