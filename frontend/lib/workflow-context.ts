@@ -67,6 +67,8 @@ export interface WorkflowState {
 
   // Stage 2: ICP
   icpGenerated: boolean;
+  icpLoading: boolean;
+  icpError?: string;
   icpData?: {
     traits: string[];
     marketInsights: string[];
@@ -93,6 +95,7 @@ export const initialWorkflowState: WorkflowState = {
   targetAudience: '',
   additionalContext: '',
   icpGenerated: false,
+  icpLoading: false,
   scrapingComplete: false,
   leads: [],
   emailsDrafted: false,

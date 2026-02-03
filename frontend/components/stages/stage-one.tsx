@@ -17,74 +17,79 @@ export default function StageOne() {
   const [details, setDetails] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!prompt.trim()) return;
     setIsProcessing(true);
 
-    // Save input to workflow state
     workflowManager.setState({
       targetAudience: prompt,
       additionalContext: details,
+      icpGenerated: false,
+      icpLoading: true,
+      icpError: undefined,
+      icpData: undefined,
     });
 
-    // Show loading notification
-    toastManager.notify({
+    const loadingToastId = toastManager.notify({
       title: 'Analyzing Your Requirements',
       message: 'Generating ICP and market intelligence...',
       type: 'loading',
       duration: 0,
     });
 
-    // Simulate ICP generation (3 seconds)
-    setTimeout(() => {
-      // Generate mock ICP
-      const icpData = {
-        traits: [
-          'B2B SaaS Decision Makers',
-          'Revenue Range: $2M-50M ARR',
-          'Team Size: 50-500 employees',
-          'Proven Lead Generation investment',
-          'Growth-focused companies',
-        ],
-        marketInsights: [
-          'Market size: $10B+ globally',
-          'Average contract value: $50K-250K/year',
-          'Decision cycle: 60-90 days',
-          'Multiple stakeholders involved',
-          'High buyer intent in Q1 & Q4',
-        ],
-        competitiveAnalysis: [
-          'Top 3 competitors identified',
-          'Our unique advantage: 3x faster implementation',
-          'Market gap: Enterprise support',
-          'Pricing competitive within 15%',
-          'Superior integration ecosystem',
-        ],
-        painPoints: [
-          'Low conversion rates (2-3%)',
-          'Long sales cycles',
-          'Lead quality inconsistency',
-          'Manual outreach processes',
-          'Limited follow-up automation',
-        ],
-      };
+    try {
+      const response = await fetch('/api/generate-icp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetAudience: prompt,
+          additionalContext: details,
+        }),
+      });
 
-      // Update workflow with ICP
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const errorMessage = payload?.error || payload?.details || 'Failed to generate ICP';
+        throw new Error(errorMessage);
+      }
+
+      const icpData = payload.icp || payload;
+
       workflowManager.setState({
         icpGenerated: true,
         icpData,
+        icpLoading: false,
+        icpError: undefined,
         currentStage: 'stage-2',
       });
 
-      setIsProcessing(false);
-
-      // Show success notification
       toastManager.notify({
         title: 'ICP Generated',
         message: 'Review and confirm to proceed with lead scraping',
         type: 'success',
       });
-    }, 3000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate ICP';
+      workflowManager.setState({
+        icpLoading: false,
+        icpGenerated: false,
+        icpError: message,
+      });
+
+      toastManager.notify({
+        title: 'ICP Generation Failed',
+        message,
+        type: 'error',
+      });
+    } finally {
+      if (loadingToastId) {
+        toastManager.remove(loadingToastId);
+      }
+      setIsProcessing(false);
+    }
   };
 
   return (

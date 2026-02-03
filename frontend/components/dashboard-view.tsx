@@ -116,25 +116,6 @@ export default function DashboardView() {
         </ResponsiveContainer>
       </Card>
 
-      {/* Quick Actions */}
-      <Card className="p-6 border-border bg-card">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Button className="gap-2 h-12" onClick={() => workflowManager.setState({ currentStage: 'stage-1' })}>
-            <Zap className="w-4 h-4" />
-            Start New Campaign
-          </Button>
-          <Button variant="outline" className="gap-2 h-12 bg-transparent" onClick={() => workflowManager.setState({ currentStage: 'stage-5' })}>
-            <Calendar className="w-4 h-4" />
-            View Active Leads
-          </Button>
-          <Button variant="outline" className="gap-2 h-12 bg-transparent" onClick={() => workflowManager.setState({ currentStage: 'history' })}>
-            <MessageCircle className="w-4 h-4" />
-            View History
-          </Button>
-        </div>
-      </Card>
-
       {/* Conversion Rate */}
       {stats.emailsSent > 0 && (
         <Card className="p-6 border-border bg-secondary/50">

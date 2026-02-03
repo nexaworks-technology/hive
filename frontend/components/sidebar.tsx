@@ -1,17 +1,20 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import {
-  Sparkles,
-  Brain,
-  Zap,
-  Wand2,
-  MessageSquare,
+  SquarePen,
+  Search,
+  PanelLeftClose,
+  PanelRightClose,
   Settings,
   LogOut,
+  SunMedium,
+  Moon,
+  ChevronRight,
   LayoutDashboard,
-  History,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,138 +23,150 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
-  const mainLinks = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  ];
+  const [isOpen, setIsOpen] = useState(true);
+  const [isHovering, setIsHovering] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const stageLinks = [
-    { id: 'stage-1', label: 'The Spark', icon: Sparkles },
-    { id: 'stage-2', label: 'The Brain', icon: Brain },
-    { id: 'stage-3', label: 'The Fuel', icon: Zap },
-    { id: 'stage-4', label: 'The Spear', icon: Wand2 },
-    { id: 'stage-5', label: 'The Closing', icon: MessageSquare },
-  ];
+  const handleReportBug = () => {
+    const note = window.prompt('Please describe the bug');
+    if (note && note.trim()) {
+      alert('Thanks for reporting!');
+    }
+  };
 
-  const otherLinks = [
-    { id: 'history', label: 'History', icon: History },
-  ];
+  useEffect(() => {
+    const root = document.documentElement.classList;
+    if (isDarkMode) {
+      root.add('dark');
+    } else {
+      root.remove('dark');
+    }
+  }, [isDarkMode]);
 
   return (
-    <div className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      <div className="p-6">
-        <div className="text-2xl font-bold text-primary">Converge</div>
-        <p className="text-xs text-sidebar-foreground/60 mt-1">AI Outreach</p>
-      </div>
-
-      <Separator className="bg-sidebar-border" />
-
-      <nav className="flex-1 px-4 py-6 space-y-4">
-        <div>
-          <div className="px-2 py-1 mb-2">
-            <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
-              Main
-            </p>
-          </div>
-          <div className="space-y-1">
-            {mainLinks.map((link) => {
-              const Icon = link.icon;
-              const isActive = activeTab === link.id;
-              return (
-                <Button
-                  key={link.id}
-                  variant={isActive ? 'default' : 'ghost'}
-                  className={`w-full justify-start gap-3 ${
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  }`}
-                  onClick={() => setActiveTab(link.id)}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                </Button>
-              );
-            })}
+    <div
+      className={`${isOpen ? 'w-64' : 'w-20 cursor-e-resize'} bg-sidebar dark:bg-[#181818] border-r border-sidebar-border flex flex-col h-screen transition-all duration-200 overflow-hidden`}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+      onClick={() => {
+        if (!isOpen) {
+          setIsOpen(true);
+        }
+      }}
+    >
+      <div className={`${isOpen ? 'p-6 justify-between' : 'p-3 justify-center relative'} flex items-center`}>
+        <div className={`flex items-center ${isOpen ? 'gap-2' : 'gap-0'}`}>
+          <img
+            src="/assests/hivelogo.svg"
+            alt="Hive logo"
+            className={`flex-shrink-0 dark:invert dark:brightness-0 ${!isOpen && isHovering ? 'hidden' : 'h-8 w-8'}`}
+          />
+          <div
+            className={`text-2xl font-bold text-primary transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 w-0'}`}
+          >
+            Hive
           </div>
         </div>
-
-        <div>
-          <div className="px-2 py-1 mb-2">
-            <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
-              Pipeline
-            </p>
-          </div>
-          <div className="space-y-1">
-            {stageLinks.map((link) => {
-              const Icon = link.icon;
-              const isActive = activeTab === link.id;
-              return (
-                <Button
-                  key={link.id}
-                  variant={isActive ? 'default' : 'ghost'}
-                  className={`w-full justify-start gap-3 ${
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  }`}
-                  onClick={() => setActiveTab(link.id)}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <div className="px-2 py-1 mb-2">
-            <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
-              Archive
-            </p>
-          </div>
-          <div className="space-y-1">
-            {otherLinks.map((link) => {
-              const Icon = link.icon;
-              const isActive = activeTab === link.id;
-              return (
-                <Button
-                  key={link.id}
-                  variant={isActive ? 'default' : 'ghost'}
-                  className={`w-full justify-start gap-3 ${
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  }`}
-                  onClick={() => setActiveTab(link.id)}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      </nav>
-
-      <Separator className="bg-sidebar-border" />
-
-      <div className="p-4 space-y-2">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
+          size="icon"
+          className={`text-sidebar-foreground hover:bg-[#efefef] active:bg-[#efefef] focus-visible:ring-0 focus-visible:ring-offset-0 ${
+            isOpen
+              ? 'cursor-e-resize'
+              : 'cursor-w-resize w-10 h-10 p-0 flex items-center justify-center absolute inset-y-0 right-4.5 my-auto'
+          }`}
+          aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
+          onClick={() => setIsOpen((prev) => !prev)}
         >
-          <Settings className="w-4 h-4" />
-          Settings
+          {isOpen ? (
+            <PanelLeftClose className="w-9 h-9 text-black dark:text-white cursor-e-resize" />
+          ) : isHovering ? (
+            <PanelRightClose className="w-9 h-9 text-black dark:text-white cursor-w-resize" />
+          ) : null}
+        </Button>
+      </div>
+
+      <div className="px-4 pb-4">
+        <Button
+          variant="ghost"
+          className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <LayoutDashboard className="w-8 h-8" />
+          <span className={isOpen ? 'inline-flex' : 'hidden'}>Dashboard</span>
         </Button>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
+          className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
+          onClick={() => setActiveTab('stage-1')}
         >
-          <LogOut className="w-4 h-4" />
-          Sign Out
+          <SquarePen className="w-8 h-8" />
+          <span className={isOpen ? 'inline-flex' : 'hidden'}>New Campaign</span>
+        </Button>
+        <div className="mt-0">
+          <Button
+            variant="ghost"
+            className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
+            onClick={() => setActiveTab('history')}
+          >
+            <Search className="w-8 h-8" />
+            <span className={isOpen ? 'inline-flex' : 'hidden'}>Search Campaign</span>
+          </Button>
+          <div className={`${isOpen ? 'flex' : 'hidden'} items-center gap-2 text-base text-[#AFAFAF] mt-2 pl-2`}>
+            <span>campaigns</span>
+            <ChevronRight className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-2 border-t border-sidebar-border mt-auto bg-sidebar dark:bg-[#181818]">
+        <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              className={`${isOpen ? 'w-full justify-start gap-3' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Settings className="w-8 h-8" />
+              <span className={isOpen ? 'inline-flex' : 'hidden'}>Settings</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-64 space-y-3"
+            align="center"
+            side="top"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <SunMedium className="h-4 w-4" />
+                <span>/</span>
+                <Moon className="h-4 w-4" />
+              </div>
+              <Switch checked={isDarkMode} onCheckedChange={setIsDarkMode} />
+            </div>
+            <button
+              type="button"
+              className="text-sm font-medium text-foreground text-left w-full hover:text-gray-400"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReportBug();
+              }}
+            >
+              Report Bug
+            </button>
+          </PopoverContent>
+        </Popover>
+        <Button
+          variant="ghost"
+          className={`${isOpen ? 'w-full justify-start gap-3' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white`}
+        >
+          <LogOut className="w-8 h-8" />
+          <span className={isOpen ? 'inline-flex' : 'hidden'}>Sign Out</span>
         </Button>
       </div>
+
     </div>
   );
 }
