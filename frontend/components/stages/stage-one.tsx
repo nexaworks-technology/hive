@@ -16,6 +16,7 @@ export default function StageOne() {
   const [prompt, setPrompt] = useState('');
   const [details, setDetails] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +38,57 @@ export default function StageOne() {
       type: 'loading',
       duration: 0,
     });
+
+    // Create a campaign record as soon as the user starts the flow so it appears in history/sidebar.
+    try {
+      const res = await fetch(`${apiBaseUrl}/campaigns`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: prompt,
+          stage: 'stage-1',
+          status: 'running',
+          payload: {
+            targetAudience: prompt,
+            additionalContext: details,
+          },
+        }),
+      });
+
+      const campaignPayload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message = campaignPayload?.error || campaignPayload?.details || 'Could not log campaign start';
+        throw new Error(message);
+      }
+
+      const existingHistory = workflowManager.getState().campaignHistory || [];
+      workflowManager.setState({
+        campaignHistory: [
+          {
+            id: campaignPayload.id,
+            targetAudience: prompt,
+            additionalContext: details,
+            icpData: undefined,
+            leads: [],
+            createdAt: campaignPayload.created_at || new Date().toISOString(),
+            leadsScraped: 0,
+            emailsSent: 0,
+            repliesReceived: 0,
+            meetingsScheduled: 0,
+          },
+          ...existingHistory,
+        ],
+      });
+    } catch (err) {
+      console.error('Failed to create campaign record', err);
+      toastManager.notify({
+        title: 'Campaign log failed',
+        message: err instanceof Error ? err.message : 'Could not log campaign start',
+        type: 'error',
+      });
+    }
 
     try {
       const response = await fetch('/api/generate-icp', {

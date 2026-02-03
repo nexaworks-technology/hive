@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
+import { workflowManager, type WorkflowState } from '@/lib/workflow-context';
 import {
   SquarePen,
   Search,
@@ -27,6 +28,10 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const [isHovering, setIsHovering] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
   const handleReportBug = () => {
     const note = window.prompt('Please describe the bug');
@@ -43,6 +48,29 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       root.remove('dark');
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const unsubscribe = workflowManager.subscribe(setWorkflowState);
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const loadCampaigns = async () => {
+      setIsLoadingCampaigns(true);
+      try {
+        const res = await fetch(`${apiBaseUrl}/campaigns`);
+        if (!res.ok) throw new Error('Failed to fetch campaigns');
+        const payload = await res.json().catch(() => ({}));
+        setCampaigns(payload.campaigns || []);
+      } catch (error) {
+        console.error('Failed to load campaigns', error);
+      } finally {
+        setIsLoadingCampaigns(false);
+      }
+    };
+
+    loadCampaigns();
+  }, [apiBaseUrl, workflowState?.campaignHistory?.length]);
 
   return (
     <div
@@ -116,6 +144,33 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           <div className={`${isOpen ? 'flex' : 'hidden'} items-center gap-2 text-base text-[#AFAFAF] mt-2 pl-2`}>
             <span>campaigns</span>
             <ChevronRight className="w-5 h-5" />
+          </div>
+          <div className={`${isOpen ? 'mt-2 max-h-64 overflow-y-auto space-y-1 pr-1' : 'hidden'}`}>
+            {isLoadingCampaigns ? (
+              <div className="space-y-1 pr-1" aria-label="Loading campaigns">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="h-9 w-full rounded-md bg-muted animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (campaigns.length > 0 ? campaigns : workflowState?.campaignHistory || []).length === 0 ? (
+              <div className="text-xs text-muted-foreground px-2 py-1">No campaigns yet</div>
+            ) : (
+              (campaigns.length > 0 ? campaigns : workflowState?.campaignHistory || []).map((campaign) => (
+                <Button
+                  key={campaign.id}
+                  variant="ghost"
+                  className="w-full justify-start text-left text-sm px-2 h-9 text-sidebar-foreground hover:text-black hover:bg-[#efefef] dark:hover:bg-[#303030]"
+                  onClick={() => setActiveTab('history')}
+                >
+                  <span className="truncate" title={campaign.title || campaign.targetAudience || campaign.id}>
+                    {campaign.title || campaign.targetAudience || campaign.id}
+                  </span>
+                </Button>
+              ))
+            )}
           </div>
         </div>
       </div>
