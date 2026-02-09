@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { workflowManager, type Lead } from '@/lib/workflow-context';
+import { useEffect, useState } from 'react';
+import { workflowManager, type Lead, type WorkflowState } from '@/lib/workflow-context';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -15,127 +15,88 @@ import {
 } from '@/components/ui/table';
 import { Zap, Play, Square } from 'lucide-react';
 
-interface ScrapedLead {
-  id: string;
-  name: string;
-  title: string;
-  company: string;
-  email: string;
-  linkedin: string;
-  enrichmentStatus: string;
-}
-
-const mockLeads: ScrapedLead[] = [
-  {
-    id: '1',
-    name: 'Sarah Johnson',
-    title: 'Lead Generation Manager',
-    company: 'Phoenix Digital',
-    email: 'pavanfg1@gmail.com',
-    linkedin: 'linkedin.com/in/sarahjohnson',
-    enrichmentStatus: 'Complete',
-  },
-  {
-    id: '2',
-    name: 'Michael Chen',
-    title: 'Operations Director',
-    company: 'Growth Catalyst Ltd',
-    email: 'pavanbabar319@gmail.com',
-    linkedin: 'linkedin.com/in/michaelchen',
-    enrichmentStatus: 'In Progress',
-  },
-  {
-    id: '3',
-    name: 'Emma Williams',
-    title: 'Head of Sales',
-    company: 'Outreach Pro',
-    email: 'testppb013@gmail.com',
-    linkedin: 'linkedin.com/in/emmawilliams',
-    enrichmentStatus: 'Complete',
-  },
-  {
-    id: '4',
-    name: 'James Rodriguez',
-    title: 'Business Development',
-    company: 'London Lead Systems',
-    email: 'pavan@nexaworks.tech',
-    linkedin: 'linkedin.com/in/jamesrodriguez',
-    enrichmentStatus: 'Pending',
-  },
-  {
-    id: '5',
-    name: 'Lisa Park',
-    title: 'Sales Director',
-    company: 'DataDrive Solutions',
-    email: 'sahil@nexaworks.tech',
-    linkedin: 'linkedin.com/in/lisapark',
-    enrichmentStatus: 'Complete',
-  },
-  {
-    id: '6',
-    name: 'David Turner',
-    title: 'VP Growth',
-    company: 'Scale Intelligence',
-    email: 'pavanfg1@gmail.com',
-    linkedin: 'linkedin.com/in/davidturner',
-    enrichmentStatus: 'In Progress',
-  },
-];
-
-const scrapedSummaries: Record<string, string> = {
-  '1': 'Lead gen manager concerned about lead quality consistency.',
-  '2': 'Ops director aiming for predictable pipeline throughput.',
-  '3': 'Sales lead wants better reply rates without extra manual work.',
-  '4': 'BD rep balancing volume and personalization speed.',
-  '5': 'Data-minded sales director focused on attributable pipeline.',
-  '6': 'Growth VP looking for repeatable, de-risked experiments.',
-};
-
 export default function StageThree() {
   const [isScraperRunning, setIsScraperRunning] = useState(false);
-  const [scrapingProgress, setScrapingProgress] = useState(45);
+  const [scrapingProgress, setScrapingProgress] = useState(0);
   const [hasDispatchedLeads, setHasDispatchedLeads] = useState(false);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [workflowState, setWorkflowState] = useState<WorkflowState | null>(workflowManager.getState());
+  const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
-  const dispatchLeadsToWorkflow = () => {
-    if (hasDispatchedLeads) return;
+  const updateFromManager = () => setWorkflowState(workflowManager.getState());
 
-    const enriched: Lead[] = mockLeads.map((lead, index) => ({
-      id: lead.id,
-      name: lead.name,
-      title: lead.title,
-      company: lead.company,
-      email: lead.email,
-      linkedin: lead.linkedin,
-      emailSent: false,
-      replied: false,
-      followupCount: 0,
-      summary: scrapedSummaries[lead.id] || 'Summary pending.',
-      talkingPoints: [],
-    }));
+  useEffect(() => {
+    const unsubscribe = workflowManager.subscribe((state) => {
+      setWorkflowState(state);
+      if (state.leads && state.leads.length) {
+        setLeads(state.leads);
+      }
+    });
+    return unsubscribe;
+  }, []);
 
+  const dispatchLeadsToWorkflow = (scrapedLeads: Lead[]) => {
     workflowManager.setState({
-      leads: enriched,
+      leads: scrapedLeads,
       scrapingComplete: true,
       emailsDrafted: false,
       currentStage: 'stage-4',
     });
     setHasDispatchedLeads(true);
+    updateFromManager();
   };
 
-  const handleStartScraping = () => {
+  const handleStartScraping = async () => {
+    if (isScraperRunning) return;
     setIsScraperRunning(true);
-    // Simulate scraping progress
-    const interval = setInterval(() => {
-      setScrapingProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsScraperRunning(false);
-          dispatchLeadsToWorkflow();
-          return 100;
-        }
-        return prev + Math.random() * 15;
+    setScrapingProgress(5);
+
+    const state = workflowManager.getState();
+    const payload = {
+      targetAudience: state.targetAudience,
+      additionalContext: state.additionalContext,
+      campaignId: state.currentCampaignId,
+      limit: 8,
+    };
+
+    try {
+      setScrapingProgress(25);
+      const res = await fetch(`${apiBaseUrl}/scrape-leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-    }, 1000);
+
+      if (!res.ok) {
+        const details = await res.json().catch(() => ({}));
+        throw new Error(details.error || 'Scraping failed');
+      }
+
+      setScrapingProgress(65);
+      const body = await res.json().catch(() => ({} as any));
+      const scraped: Lead[] = (body.leads || []).map((lead: any, idx: number) => ({
+        id: lead.id || `scraped-${idx}`,
+        name: lead.name || 'Lead',
+        title: lead.title || 'Contact',
+        company: lead.company || 'Unknown Co',
+        email: lead.email || '',
+        linkedin: lead.linkedin || '',
+        emailSent: false,
+        replied: false,
+        followupCount: 0,
+        summary: lead.summary || 'Scraped lead',
+        talkingPoints: lead.talkingPoints || [],
+      }));
+
+      setLeads(scraped);
+      dispatchLeadsToWorkflow(scraped);
+      setScrapingProgress(100);
+    } catch (err) {
+      console.error('Scrape failed', err);
+      setScrapingProgress(0);
+    } finally {
+      setIsScraperRunning(false);
+    }
   };
 
   return (
@@ -187,31 +148,26 @@ export default function StageThree() {
           <div className="bg-secondary/50 border border-border rounded-lg p-4 font-mono text-xs text-muted-foreground max-h-40 overflow-y-auto space-y-1">
             <div>{'>'} Initializing scraper...</div>
             <div>{'>'} Connecting to data sources...</div>
-            <div>{'>'} Querying: B2B Lead Gen agencies</div>
-            <div>{'>'} Found 4 matches in London region</div>
+            <div>{'>'} Querying: {workflowState?.targetAudience || 'your ICP'}</div>
             <div>{'>'} Enriching company data...</div>
             <div>{'>'} Fetching contact information...</div>
-            {isScraperRunning && (
-              <div className="animate-pulse">{'>'} Processing leads...</div>
-            )}
-            {!isScraperRunning && hasDispatchedLeads && (
-              <div className="text-primary">{'>'} Leads pushed to email stage</div>
-            )}
+            {isScraperRunning && <div className="animate-pulse">{'>'} Processing leads...</div>}
+            {!isScraperRunning && hasDispatchedLeads && <div className="text-primary">{'>'} Leads pushed to email stage</div>}
           </div>
         </div>
 
         <div className="mt-6 grid grid-cols-3 gap-4">
           <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
             <p className="text-xs text-muted-foreground">Total Leads</p>
-            <p className="text-2xl font-bold text-primary mt-1">127</p>
+            <p className="text-2xl font-bold text-primary mt-1">{leads.length}</p>
           </div>
           <div className="bg-accent/5 border border-accent/20 rounded-lg p-4">
             <p className="text-xs text-muted-foreground">Enriched</p>
-            <p className="text-2xl font-bold text-accent mt-1">94</p>
+            <p className="text-2xl font-bold text-accent mt-1">{leads.filter((l) => l.email).length}</p>
           </div>
           <div className="bg-secondary border border-border rounded-lg p-4">
             <p className="text-xs text-muted-foreground">In Progress</p>
-            <p className="text-2xl font-bold text-foreground mt-1">33</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{Math.max(0, Math.round(leads.length * 0.2))}</p>
           </div>
         </div>
       </Card>
@@ -233,37 +189,37 @@ export default function StageThree() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockLeads.map((lead) => (
-                <TableRow key={lead.id} className="border-border">
-                  <TableCell className="font-medium text-foreground">{lead.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{lead.title}</TableCell>
-                  <TableCell className="text-muted-foreground">{lead.company}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{lead.email}</TableCell>
-                  <TableCell>
-                    <a
-                      href={`https://${lead.linkedin}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline text-sm"
-                    >
-                      Profile
-                    </a>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                        lead.enrichmentStatus === 'Complete'
-                          ? 'bg-primary/10 text-primary'
-                          : lead.enrichmentStatus === 'In Progress'
-                            ? 'bg-accent/10 text-accent'
-                            : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {lead.enrichmentStatus}
-                    </span>
+              {leads.length === 0 ? (
+                <TableRow className="border-border">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground text-sm">
+                    No leads yet. Start scraping to populate this table.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                leads.map((lead) => (
+                  <TableRow key={lead.id} className="border-border">
+                    <TableCell className="font-medium text-foreground">{lead.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{lead.title}</TableCell>
+                    <TableCell className="text-muted-foreground">{lead.company}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{lead.email}</TableCell>
+                    <TableCell>
+                      <a
+                        href={lead.linkedin ? `https://${lead.linkedin}` : '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline text-sm"
+                      >
+                        Profile
+                      </a>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${lead.email ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                        {lead.email ? 'Enriched' : 'Pending'}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>

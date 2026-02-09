@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { workflowManager, type WorkflowState } from '@/lib/workflow-context';
@@ -24,6 +26,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -31,7 +34,25 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
+  const [showGoogleAuth, setShowGoogleAuth] = useState(false);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [googleTokens, setGoogleTokens] = useState<any>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+
+  const loadGoogleTokens = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem('hive-google-oauth');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const saveGoogleTokens = (tokens: any) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('hive-google-oauth', JSON.stringify(tokens));
+  };
 
   const handleReportBug = () => {
     const note = window.prompt('Please describe the bug');
@@ -53,6 +74,25 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     const unsubscribe = workflowManager.subscribe(setWorkflowState);
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    setGoogleTokens(loadGoogleTokens());
+  }, []);
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const data = event.data as any;
+      if (data?.type === 'hive-google-tokens' && data?.tokens) {
+        setGoogleTokens(data.tokens);
+        saveGoogleTokens(data.tokens);
+        setShowGoogleAuth(false);
+        setActiveTab('stage-1');
+        router.push('/');
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [router, setActiveTab]);
 
   useEffect(() => {
     const loadCampaigns = async () => {
@@ -119,7 +159,10 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         <Button
           variant="ghost"
           className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
-          onClick={() => setActiveTab('dashboard')}
+          onClick={() => {
+            setActiveTab('dashboard');
+            router.push('/dashboard');
+          }}
         >
           <LayoutDashboard className="w-8 h-8" />
           <span className={isOpen ? 'inline-flex' : 'hidden'}>Dashboard</span>
@@ -127,7 +170,15 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         <Button
           variant="ghost"
           className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
-          onClick={() => setActiveTab('stage-1')}
+          onClick={() => {
+            const tokens = loadGoogleTokens();
+            if (tokens?.access_token || tokens?.refresh_token) {
+              setActiveTab('stage-1');
+              router.push('/');
+            } else {
+              setShowGoogleAuth(true);
+            }
+          }}
         >
           <SquarePen className="w-8 h-8" />
           <span className={isOpen ? 'inline-flex' : 'hidden'}>New Campaign</span>
@@ -145,7 +196,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <span>campaigns</span>
             <ChevronRight className="w-5 h-5" />
           </div>
-          <div className={`${isOpen ? 'mt-2 max-h-64 overflow-y-auto space-y-1 pr-1' : 'hidden'}`}>
+          <div className={`${isOpen ? 'mt-2 max-h-[70vh] overflow-y-auto space-y-1 pr-1' : 'hidden'}`}>
             {isLoadingCampaigns ? (
               <div className="space-y-1 pr-1" aria-label="Loading campaigns">
                 {[0, 1, 2].map((i) => (
@@ -163,7 +214,11 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                   key={campaign.id}
                   variant="ghost"
                   className="w-full justify-start text-left text-sm px-2 h-9 text-sidebar-foreground hover:text-black hover:bg-[#efefef] dark:hover:bg-[#303030]"
-                  onClick={() => setActiveTab('history')}
+                  onClick={() => {
+                    workflowManager.setState({ currentCampaignId: campaign.id });
+                    setActiveTab('history');
+                    router.push(`/dashboard/${campaign.id}`);
+                  }}
                 >
                   <span className="truncate" title={campaign.title || campaign.targetAudience || campaign.id}>
                     {campaign.title || campaign.targetAudience || campaign.id}
@@ -221,6 +276,51 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           <span className={isOpen ? 'inline-flex' : 'hidden'}>Sign Out</span>
         </Button>
       </div>
+
+      <Dialog open={showGoogleAuth} onOpenChange={setShowGoogleAuth}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <img src="/assests/hivelogo.svg" alt="Hive" className="h-8 w-8" />
+              <span className="text-lg font-semibold">Authorize Hive × Google Calendar</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-3 p-3 rounded-md bg-secondary/50 border border-border">
+            <img src="/assests/hivelogo.svg" alt="Hive" className="h-10 w-10" />
+            <span className="text-xl font-semibold">×</span>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-md bg-[#4285F4] text-white font-semibold text-sm grid place-items-center">G</div>
+              <span className="text-sm font-semibold">Google Calendar</span>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Authorize Hive to check your availability (Mon–Sat, 1–8pm IST) and create meetings with Google Meet links. You can revoke access anytime from your Google account.
+          </p>
+          <DialogFooter className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setShowGoogleAuth(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                setIsAuthorizing(true);
+                try {
+                  const res = await fetch(`${apiBaseUrl}/google/auth-url`);
+                  const payload = await res.json();
+                  if (!payload?.url) throw new Error('Missing auth URL');
+                  window.open(payload.url, 'hive-google-consent', 'width=480,height=640');
+                } catch (err) {
+                  console.error('Auth URL error', err);
+                } finally {
+                  setIsAuthorizing(false);
+                }
+              }}
+              disabled={isAuthorizing}
+            >
+              {isAuthorizing ? 'Opening...' : 'Authorize'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

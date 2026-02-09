@@ -35,6 +35,7 @@ export default function StageFive() {
     meetingType: 'Google Meet' as const,
   });
   const [replySendingId, setReplySendingId] = useState<string | null>(null);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
   const persistenceLeads = workflowState?.leads.filter((lead) => !lead.replied) || []; // Define persistenceLeads variable
   const hotLeads = workflowState?.leads.filter((lead) => lead.replied && lead.sentiment === 'Very Interested') || []; // Define hotLeads variable
@@ -103,6 +104,41 @@ export default function StageFive() {
       intervals.forEach(clearTimeout);
     };
   }, [workflowState?.emailsDrafted]);
+
+  // Persist leads + engagement to backend once sends are underway so follow-up can be revisited later.
+  useEffect(() => {
+    if (!workflowState?.currentCampaignId) return;
+    if (!workflowState.leads.some((lead) => lead.emailSent)) return;
+
+    const persistProgress = async () => {
+      try {
+        const stats = {
+          leadsScraped: workflowState.leads.length,
+          emailsSent: workflowState.leads.filter((l) => l.emailSent).length,
+          repliesReceived: workflowState.leads.filter((l) => l.replied).length,
+          meetingsScheduled: workflowState.leads.filter((l) => l.meeting).length,
+        };
+
+        await fetch(`${apiBaseUrl}/campaigns/${workflowState.currentCampaignId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            stage: 'stage-5',
+            status: 'follow-up',
+            payload: {
+              leads: workflowState.leads,
+              sentEmails: workflowState.sentEmails,
+              stats,
+            },
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to persist campaign progress', err);
+      }
+    };
+
+    persistProgress();
+  }, [apiBaseUrl, workflowState?.currentCampaignId, workflowState?.leads, workflowState?.sentEmails]);
 
   const buildReplyDraft = (lead: Lead, sentiment: ReplySentiment) => {
     const firstName = lead.name.split(' ')[0] || 'there';
@@ -334,10 +370,24 @@ Appreciate the quick response. I’ll pause outreach for now. If priorities chan
                   <TableCell>
                     <div className="flex flex-col gap-2">
                       {lead.meeting ? (
-                        <Button size="sm" className="gap-2 bg-accent/10 text-accent hover:bg-accent/20" variant="ghost">
-                          <Video className="w-3 h-3" />
-                          Join
-                        </Button>
+                        lead.meeting.meetingLink ? (
+                          <Button
+                            size="sm"
+                            className="gap-2 bg-accent/10 text-accent hover:bg-accent/20"
+                            variant="ghost"
+                            asChild
+                          >
+                            <a href={lead.meeting.meetingLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                              <Video className="w-3 h-3" />
+                              Join
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button size="sm" className="gap-2" variant="outline" disabled>
+                            <Video className="w-3 h-3" />
+                            Link pending
+                          </Button>
+                        )
                       ) : lead.replied ? (
                         <Button
                           onClick={() => {

@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Badge } from '@/components/ui/badge';
 import { workflowManager, type WorkflowState } from '@/lib/workflow-context';
-import { Users, Mail, MessageCircle, Calendar, TrendingUp, Zap } from 'lucide-react';
+import { Users, Mail, MessageCircle, Calendar, TrendingUp, Bell, Clock, Video } from 'lucide-react';
 
 export default function DashboardView() {
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
@@ -25,11 +25,31 @@ export default function DashboardView() {
     totalCampaigns: workflowState.campaignHistory.length,
   };
 
-  const chartData = [
-    { name: 'Leads', value: stats.leadsScraped },
-    { name: 'Emails Sent', value: stats.emailsSent },
-    { name: 'Replies', value: stats.repliesReceived },
-    { name: 'Meetings', value: stats.meetingsScheduled },
+  const upcomingMeetings = [
+    {
+      id: 'mtg-1',
+      title: 'Product demo with Acme Inc',
+      contact: 'Alex Johnson · VP Sales',
+      time: 'Tomorrow · 10:00 AM',
+      channel: 'Zoom',
+      status: 'Confirmed',
+    },
+    {
+      id: 'mtg-2',
+      title: 'Onboarding call with Nova Labs',
+      contact: 'Priya Menon · Head of Ops',
+      time: 'Fri · 2:30 PM',
+      channel: 'Google Meet',
+      status: 'Waiting on reply',
+    },
+    {
+      id: 'mtg-3',
+      title: 'Pilot recap with Brightflow',
+      contact: 'Sam Lee · RevOps',
+      time: 'Mon · 9:00 AM',
+      channel: 'Zoom',
+      status: 'Confirmed',
+    },
   ];
 
   return (
@@ -92,28 +112,35 @@ export default function DashboardView() {
         </Card>
       </div>
 
-      {/* Charts */}
+      {/* Upcoming meetings */}
       <Card className="p-6 border-border bg-card">
-        <h3 className="text-lg font-semibold text-foreground mb-6 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-accent" />
-          Campaign Performance
-        </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="name" stroke="var(--muted-foreground)" />
-            <YAxis stroke="var(--muted-foreground)" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'var(--card)',
-                border: `1px solid var(--border)`,
-                borderRadius: '8px',
-                color: 'var(--foreground)',
-              }}
-            />
-            <Bar dataKey="value" fill="var(--primary)" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <Bell className="w-5 h-5 text-accent" />
+            Upcoming meetings
+          </h3>
+          <Button variant="outline" size="sm">View calendar</Button>
+        </div>
+        <div className="space-y-3">
+          {upcomingMeetings.map((meeting) => (
+            <div key={meeting.id} className="flex items-center gap-4 rounded-lg border border-border/60 bg-muted/20 p-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                {meeting.channel.toLowerCase().includes('zoom') ? (
+                  <Video className="h-5 w-5" />
+                ) : (
+                  <Clock className="h-5 w-5" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-foreground">{meeting.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  {meeting.contact} · {meeting.time} · {meeting.channel}
+                </p>
+              </div>
+              <Badge variant={meeting.status === 'Confirmed' ? 'default' : 'secondary'}>{meeting.status}</Badge>
+            </div>
+          ))}
+        </div>
       </Card>
 
       {/* Conversion Rate */}

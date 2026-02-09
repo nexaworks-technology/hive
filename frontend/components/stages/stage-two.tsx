@@ -30,154 +30,21 @@ export default function StageTwo() {
 
     setIsConfirming(true);
 
-    // Show notification
-    toastManager.notify({
-      title: 'Scraping Starting',
-      message: 'Discovering leads matching your ICP. You will be notified when complete.',
-      type: 'loading',
-      duration: 0,
+    // Push workflow forward without mock data; Stage 3 handles real scraping
+    workflowManager.setState({
+      scrapingComplete: false,
+      emailsDrafted: false,
+      leads: [],
+      currentStage: 'stage-3',
     });
 
-    // Simulate scraping (5 seconds)
-    setTimeout(() => {
-      // Generate mock leads
-      const mockLeads = [
-        {
-          id: '1',
-          name: 'Sarah Johnson',
-          title: 'Lead Generation Manager',
-          company: 'Phoenix Digital',
-          email: 'pavanfg1@gmail.com',
-          linkedin: 'linkedin.com/in/sarahjohnson',
-          emailSent: false,
-          replied: false,
-          followupCount: 0 as const,
-          summary: 'Runs lead gen at a boutique agency; recently shared concerns about lead quality consistency.',
-          talkingPoints: [
-            'Reference her LinkedIn post on lead quality',
-            'Offer ideas on validation and scoring',
-            'Keep tone consultative, not salesy',
-          ],
-        },
-        {
-          id: '2',
-          name: 'Michael Chen',
-          title: 'Operations Director',
-          company: 'Growth Catalyst Ltd',
-          email: 'pavanbabar319@gmail.com',
-          linkedin: 'linkedin.com/in/michaelchen',
-          emailSent: false,
-          replied: false,
-          followupCount: 0 as const,
-          summary: 'Ops lead focused on throughput; looking for predictable pipeline health.',
-          talkingPoints: [
-            'Mention ops throughput and predictable pipeline',
-            'Offer one concrete process tweak',
-            'Invite him to review a short system map',
-          ],
-        },
-        {
-          id: '3',
-          name: 'Emma Williams',
-          title: 'Head of Sales',
-          company: 'Outreach Pro',
-          email: 'testppb013@gmail.com',
-          linkedin: 'linkedin.com/in/emmawilliams',
-          emailSent: false,
-          replied: false,
-          followupCount: 0 as const,
-          summary: 'Sales leader aiming to lift reply rates without ballooning manual work.',
-          talkingPoints: [
-            'Show how to improve replies without extra headcount',
-            'Point to a similar sales org win',
-            'Offer a ready-to-use opener',
-          ],
-        },
-        {
-          id: '4',
-          name: 'James Rodriguez',
-          title: 'Business Development',
-          company: 'London Lead Systems',
-          email: 'pavan@nexaworks.tech',
-          linkedin: 'linkedin.com/in/jamesrodriguez',
-          emailSent: false,
-          replied: false,
-          followupCount: 0 as const,
-          summary: 'BD rep juggling volume; wants outreach that feels personal but is fast.',
-          talkingPoints: [
-            'Lean on speed + personalization balance',
-            'Share a template he can reuse',
-            'Offer a quick test on 10 contacts',
-          ],
-        },
-        {
-          id: '5',
-          name: 'Lisa Park',
-          title: 'Sales Director',
-          company: 'DataDrive Solutions',
-          email: 'sahil@nexaworks.tech',
-          linkedin: 'linkedin.com/in/lisapark',
-          emailSent: false,
-          replied: false,
-          followupCount: 0 as const,
-          summary: 'Data-minded director; cares about attributable pipeline.',
-          talkingPoints: [
-            'Emphasize measurable pipeline contribution',
-            'Reference data cleanliness for attribution',
-            'Suggest a small AB test',
-          ],
-        },
-        {
-          id: '6',
-          name: 'David Turner',
-          title: 'VP Growth',
-          company: 'Scale Intelligence',
-          email: 'pavanfg1@gmail.com',
-          linkedin: 'linkedin.com/in/davidturner',
-          emailSent: false,
-          replied: false,
-          followupCount: 0 as const,
-          summary: 'Growth lead focused on repeatable plays; open to experiments that de-risk.',
-          talkingPoints: [
-            'Highlight repeatability and experiment design',
-            'Offer a low-risk pilot',
-            'Share a benchmark result',
-          ],
-        },
-      ];
+    toastManager.notify({
+      title: 'Ready to scrape',
+      message: 'Jumping to The Fuel to run the real scraper.',
+      type: 'info',
+    });
 
-      // Update workflow with leads
-      workflowManager.setState({
-        scrapingComplete: true,
-        leads: mockLeads,
-        currentStage: 'stage-3',
-      });
-
-      setIsConfirming(false);
-
-      // Show success notification
-      toastManager.notify({
-        title: 'Scraping Complete!',
-        message: 'Found 6 high-quality leads. Drafting emails next...',
-        type: 'success',
-      });
-
-      // Simulate email drafting in background (4 seconds)
-      setTimeout(() => {
-        workflowManager.setState({
-          emailsDrafted: true,
-          leads: mockLeads,
-          currentStage: 'stage-4',
-        });
-
-        // Show drafts ready notification
-        toastManager.notify({
-          title: 'Drafts Ready',
-          message: 'Review drafts in The Spear. Sending is disabled until email is integrated.',
-          type: 'info',
-        });
-      }, 4000);
-    }, 5000);
+    setIsConfirming(false);
   };
 
   const icp = workflowState?.icpData;

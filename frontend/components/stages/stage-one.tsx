@@ -65,6 +65,7 @@ export default function StageOne() {
 
       const existingHistory = workflowManager.getState().campaignHistory || [];
       workflowManager.setState({
+        currentCampaignId: campaignPayload.id,
         campaignHistory: [
           {
             id: campaignPayload.id,

@@ -15,6 +15,14 @@ const MODEL_PREFERENCE = [
 ]
 
 const OPENAI_MODEL = 'gpt-4.1-mini'
+const OPENROUTER_API_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions'
+const OPENROUTER_MODEL_LIST = (process.env.OPENROUTER_MODEL_ICP || process.env.OPENROUTER_MODEL || '')
+  .split(',')
+  .map((m) => m.trim())
+  .filter(Boolean)
+const OPENROUTER_MODELS = OPENROUTER_MODEL_LIST.length
+  ? OPENROUTER_MODEL_LIST
+  : ['openai/gpt-4.1-mini', 'anthropic/claude-3.5-sonnet']
 
 const coerceStringArray = (value: unknown, fallback: string[]): string[] => {
   if (Array.isArray(value)) {
@@ -165,6 +173,40 @@ const buildPrompt = (targetAudience: string, additionalContext: string) => `Inpu
 - Additional context: ${additionalContext || 'Not provided'}
 Return the JSON now.`
 
+const callOpenRouter = async (
+  apiKey: string,
+  model: string,
+  targetAudience: string,
+  additionalContext: string
+) => {
+  const response = await fetch(OPENROUTER_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'https://hive.local',
+      'X-Title': process.env.OPENROUTER_TITLE || 'Hive',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: buildPrompt(targetAudience, additionalContext) },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.25,
+    }),
+  })
+
+  if (!response.ok) {
+    return { ok: false, status: response.status, details: await response.text() }
+  }
+
+  const data = await response.json()
+  const content = data?.choices?.[0]?.message?.content || ''
+  return { ok: true, content }
+}
+
 export async function POST(req: Request) {
   try {
     const { targetAudience, additionalContext } = (await req.json()) as {
@@ -179,19 +221,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'targetAudience is required' }, { status: 400 })
     }
 
-    const apiKey =
+    const geminiKey =
       process.env.GEMINI_API_KEY_ICP ||
       process.env.GEMINI_API_KEY ||
       process.env.gemini_api_key ||
       process.env.GEMINI ||
       process.env.xApi_key
 
-    if (!apiKey) {
-      return NextResponse.json({ error: 'Missing GEMINI_API_KEY_ICP' }, { status: 500 })
+    const openRouterKey = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_KEY
+    const openAiKey = process.env.OPENAI_API_KEY_ICP || process.env.OPENAI_API_KEY
+
+    if (!geminiKey && !openRouterKey && !openAiKey) {
+      return NextResponse.json({ error: 'Missing LLM API key (OpenRouter, OpenAI, or Gemini)' }, { status: 500 })
     }
 
     const makeRequest = async (model: string) => {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -246,9 +291,24 @@ export async function POST(req: Request) {
       return new Response('Service unavailable', { status: 503 })
     }
 
+    let openRouterDetails: string | undefined
+    if (openRouterKey) {
+      for (const model of OPENROUTER_MODELS) {
+        const or = await callOpenRouter(openRouterKey, model, trimmedAudience, trimmedContext)
+        if (or.ok) {
+          const parsed = parseContent(or.content)
+          if (parsed) {
+            const icp = normalizeIcp(parsed, trimmedAudience, trimmedContext)
+            return NextResponse.json({ icp, source: 'openrouter', model })
+          }
+        } else {
+          openRouterDetails = or.details?.slice(0, 500) || `status ${or.status}`
+        }
+      }
+    }
+
     let openAiDetails: string | undefined
     // Try OpenAI first
-    const openAiKey = process.env.OPENAI_API_KEY_ICP || process.env.OPENAI_API_KEY
     if (openAiKey) {
       const oa = await callOpenAI(openAiKey, trimmedAudience, trimmedContext)
       if (oa.ok) {
@@ -262,16 +322,18 @@ export async function POST(req: Request) {
     let response: Response | null = null
     let usedModel = ''
 
-    for (const model of MODEL_PREFERENCE) {
-      const res = await withRetry(model, 3, 800)
-      if (res.ok) {
-        response = res
-        usedModel = model
-        break
-      }
+    if (geminiKey) {
+      for (const model of MODEL_PREFERENCE) {
+        const res = await withRetry(model, 3, 800)
+        if (res.ok) {
+          response = res
+          usedModel = model
+          break
+        }
 
-      // If non-transient (e.g., 404 model not found), try next model
-      usedModel = model
+        // If non-transient (e.g., 404 model not found), try next model
+        usedModel = model
+      }
     }
 
     if (!response) {
@@ -282,6 +344,7 @@ export async function POST(req: Request) {
           source: 'fallback',
           reason: 'All Gemini models unavailable; OpenAI did not succeed',
           openaiDetails: openAiDetails,
+          openRouterDetails,
         },
         { status: 200 }
       )
@@ -298,6 +361,7 @@ export async function POST(req: Request) {
             status: response.status,
             details: details.slice(0, 300),
             openaiDetails: openAiDetails,
+            openRouterDetails,
           },
           { status: 200 }
         )

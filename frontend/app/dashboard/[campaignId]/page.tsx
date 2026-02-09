@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sidebar } from '@/components/sidebar';
 import StageOne from '@/components/stages/stage-one';
@@ -14,18 +15,30 @@ import { Header } from '@/components/header';
 import { ToastContainer } from '@/components/toast-notification';
 import { workflowManager, type WorkflowState } from '@/lib/workflow-context';
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState(() => workflowManager.getState().currentStage || 'stage-1');
+export default function CampaignDashboardPage() {
+  const params = useParams<{ campaignId: string }>();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState('history');
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
 
   useEffect(() => {
+    const campaignId = params?.campaignId;
+    workflowManager.setState({ currentStage: 'history', currentCampaignId: campaignId });
+
     const unsubscribe = workflowManager.subscribe((state) => {
       setWorkflowState(state);
       setActiveTab(state.currentStage);
     });
 
     return unsubscribe;
-  }, []);
+  }, [params?.campaignId]);
+
+  useEffect(() => {
+    // if campaign id missing, bounce back to dashboard
+    if (!params?.campaignId) {
+      router.replace('/dashboard');
+    }
+  }, [params?.campaignId, router]);
 
   return (
     <div className="flex h-screen bg-background">

@@ -14,11 +14,13 @@ import { Header } from '@/components/header';
 import { ToastContainer } from '@/components/toast-notification';
 import { workflowManager, type WorkflowState } from '@/lib/workflow-context';
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState(() => workflowManager.getState().currentStage || 'stage-1');
+export default function DashboardPage() {
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
 
   useEffect(() => {
+    workflowManager.setState({ currentStage: 'dashboard' });
+
     const unsubscribe = workflowManager.subscribe((state) => {
       setWorkflowState(state);
       setActiveTab(state.currentStage);

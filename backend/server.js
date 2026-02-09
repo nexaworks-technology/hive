@@ -3,6 +3,8 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import campaignsRouter from './routes/campaigns.js';
+import scrapeLeadsRouter from './routes/scrape-leads.js';
+import googleCalendarRouter from './routes/google-calendar.js';
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -15,6 +17,8 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/campaigns', campaignsRouter);
+app.use('/scrape-leads', scrapeLeadsRouter);
+app.use('/google', googleCalendarRouter);
 
 app.listen(port, () => {
   console.log(`Backend API listening on http://localhost:${port}`);

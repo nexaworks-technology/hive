@@ -57,6 +57,7 @@ export interface SentEmailRecord {
   company: string;
   email: string;
   subject?: string;
+  body?: string;
   sentAt: string;
 }
 
@@ -64,6 +65,7 @@ export interface WorkflowState {
   // Current Campaign
   targetAudience: string;
   additionalContext: string;
+  currentCampaignId?: string | null;
 
   // Stage 2: ICP
   icpGenerated: boolean;
@@ -94,6 +96,7 @@ export interface WorkflowState {
 export const initialWorkflowState: WorkflowState = {
   targetAudience: '',
   additionalContext: '',
+  currentCampaignId: null,
   icpGenerated: false,
   icpLoading: false,
   scrapingComplete: false,
@@ -104,7 +107,40 @@ export const initialWorkflowState: WorkflowState = {
   campaignHistory: [],
 };
 
-let workflowState = { ...initialWorkflowState };
+const STORAGE_KEY = 'hive-workflow-state-v1';
+
+const loadPersistedState = (): WorkflowState => {
+  if (typeof window === 'undefined') return { ...initialWorkflowState };
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...initialWorkflowState };
+
+    const parsed = JSON.parse(raw) as Partial<WorkflowState>;
+    return {
+      ...initialWorkflowState,
+      ...parsed,
+      currentCampaignId: typeof parsed.currentCampaignId !== 'undefined' ? parsed.currentCampaignId : null,
+      leads: parsed.leads || [],
+      sentEmails: parsed.sentEmails || [],
+      campaignHistory: parsed.campaignHistory || [],
+    };
+  } catch (err) {
+    console.warn('Failed to load workflow state from storage', err);
+    return { ...initialWorkflowState };
+  }
+};
+
+const persistState = (state: WorkflowState) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (err) {
+    console.warn('Failed to persist workflow state', err);
+  }
+};
+
+let workflowState = loadPersistedState();
 let listeners: ((state: WorkflowState) => void)[] = [];
 
 export const workflowManager = {
@@ -114,6 +150,7 @@ export const workflowManager = {
 
   setState(updater: Partial<WorkflowState>) {
     workflowState = { ...workflowState, ...updater };
+    persistState(workflowState);
     this.notify();
   },
 
@@ -131,6 +168,7 @@ export const workflowManager = {
 
   reset() {
     workflowState = { ...initialWorkflowState };
+    persistState(workflowState);
     this.notify();
   },
 };
