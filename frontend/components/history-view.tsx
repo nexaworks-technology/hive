@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/table';
 import { workflowManager, type WorkflowState, type Lead } from '@/lib/workflow-context';
 import { Clock, Mail, MessageCircle, Repeat2, Linkedin, Send } from 'lucide-react';
+import { useSessionContext } from '@/components/auth-provider';
 
 export default function HistoryView() {
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
@@ -19,6 +20,7 @@ export default function HistoryView() {
   const [remoteCampaigns, setRemoteCampaigns] = useState<any[]>([]);
   const [isLoadingRemote, setIsLoadingRemote] = useState(false);
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+  const { session } = useSessionContext();
 
   useEffect(() => {
     const unsubscribe = workflowManager.subscribe(setWorkflowState);
@@ -29,7 +31,9 @@ export default function HistoryView() {
     const fetchCampaigns = async () => {
       setIsLoadingRemote(true);
       try {
-        const res = await fetch(`${apiBaseUrl}/campaigns`);
+        const res = await fetch(`${apiBaseUrl}/campaigns`, {
+          headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+        });
         if (!res.ok) throw new Error('Failed to fetch campaigns');
         const payload = await res.json().catch(() => ({}));
         setRemoteCampaigns(payload.campaigns || []);
@@ -40,8 +44,10 @@ export default function HistoryView() {
       }
     };
 
-    fetchCampaigns();
-  }, [apiBaseUrl]);
+    if (session) {
+      fetchCampaigns();
+    }
+  }, [apiBaseUrl, session]);
 
   if (!workflowState) return null;
 

@@ -1,5 +1,8 @@
 import express from 'express'
+import crypto from 'node:crypto'
 import { google } from 'googleapis'
+import { supabase } from '../supabase-client.js'
+import requireAuth from '../middleware/require-auth.js'
 
 const router = express.Router()
 
@@ -14,6 +17,23 @@ const DEFAULT_LEAD_MINUTES = 120
 const IST_OFFSET_MINUTES = 330 // IST is UTC+5:30
 const WORK_START_HOUR_IST = 13
 const WORK_END_HOUR_IST = 20
+const STATE_TTL_MS = 10 * 60 * 1000
+const pendingStates = new Map()
+
+const createState = (userId) => {
+  const state = crypto.randomUUID()
+  pendingStates.set(state, { userId, expiresAt: Date.now() + STATE_TTL_MS })
+  return state
+}
+
+const consumeState = (state) => {
+  if (!state) return null
+  const entry = pendingStates.get(state)
+  if (!entry) return null
+  pendingStates.delete(state)
+  if (entry.expiresAt < Date.now()) return null
+  return entry.userId
+}
 
 const getOAuthClient = () => {
   const clientId = process.env.GOOGLE_CLIENT_ID
@@ -27,10 +47,37 @@ const getOAuthClient = () => {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri)
 }
 
-router.get('/auth-url', (req, res) => {
+const getTokensForUser = async (userId) => {
+  const { data, error } = await supabase
+    .from('google_tokens')
+    .select('access_token, refresh_token, scope, expiry_date, token_type')
+    .eq('user_id', userId)
+    .limit(1)
+
+  if (error) throw error
+  return data?.[0]
+}
+
+const saveTokensForUser = async (userId, tokens) => {
+  const payload = {
+    user_id: userId,
+    access_token: tokens.access_token || null,
+    refresh_token: tokens.refresh_token || null,
+    scope: tokens.scope || null,
+    expiry_date: tokens.expiry_date || null,
+    token_type: tokens.token_type || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { error } = await supabase.from('google_tokens').upsert(payload, { onConflict: 'user_id' })
+  if (error) throw error
+  return payload
+}
+
+router.get('/auth-url', requireAuth, (req, res) => {
   try {
     const client = getOAuthClient()
-    const state = req.query.state || ''
+    const state = createState(req.user.id)
 
     const url = client.generateAuthUrl({
       access_type: 'offline',
@@ -47,14 +94,15 @@ router.get('/auth-url', (req, res) => {
   }
 })
 
-router.post('/exchange', async (req, res) => {
+router.post('/exchange', requireAuth, async (req, res) => {
   try {
     const { code } = req.body || {}
     if (!code) return res.status(400).json({ error: 'code is required' })
 
     const client = getOAuthClient()
     const { tokens } = await client.getToken(code)
-    res.json({ tokens })
+    await saveTokensForUser(req.user.id, tokens)
+    res.json({ connected: true })
   } catch (err) {
     console.error('[google][exchange] error', err)
     res.status(500).json({ error: 'Failed to exchange code', details: err.message })
@@ -65,10 +113,16 @@ router.post('/exchange', async (req, res) => {
 router.get('/callback', async (req, res) => {
   try {
     const code = req.query.code
+    const state = req.query.state
     if (!code) return res.status(400).send('Missing code')
+
+    const userId = consumeState(String(state || ''))
+    if (!userId) return res.status(400).send('Missing or expired state')
 
     const client = getOAuthClient()
     const { tokens } = await client.getToken(String(code))
+
+    await saveTokensForUser(userId, tokens)
 
     const safeTokens = {
       access_token: tokens.access_token,
@@ -80,10 +134,10 @@ router.get('/callback', async (req, res) => {
 
     const html = `<!DOCTYPE html><html><body><script>
       if (window.opener) {
-        window.opener.postMessage({ type: 'hive-google-tokens', tokens: ${JSON.stringify(safeTokens)} }, '*');
+        window.opener.postMessage({ type: 'hive-google-connected' }, '*');
         window.close();
       } else {
-        document.write('Tokens received. You can close this window.');
+        document.write('Google connected. You can close this window.');
       }
     </script></body></html>`
 
@@ -94,13 +148,16 @@ router.get('/callback', async (req, res) => {
   }
 })
 
-const setCredentials = async (tokens) => {
+const setCredentials = async (tokens, userId) => {
   const client = getOAuthClient()
   client.setCredentials(tokens)
 
   if (tokens?.refresh_token && (!tokens.access_token || tokens.expiry_date <= Date.now())) {
     const { credentials } = await client.refreshAccessToken()
     client.setCredentials(credentials)
+    if (userId) {
+      await saveTokensForUser(userId, credentials)
+    }
     return { client, credentials }
   }
 
@@ -155,14 +212,23 @@ const buildAvailability = ({ busy, nowUtcMs, days = DEFAULT_LOOKAHEAD_DAYS, slot
   return slots
 }
 
-router.post('/availability', async (req, res) => {
+router.get('/status', requireAuth, async (req, res) => {
   try {
-    const { access_token, refresh_token, calendarId = 'primary', days, slotMinutes, leadMinutes, maxSlots } = req.body || {}
-    if (!access_token && !refresh_token) {
-      return res.status(400).json({ error: 'access_token or refresh_token is required' })
-    }
+    const tokens = await getTokensForUser(req.user.id)
+    res.json({ connected: Boolean(tokens?.refresh_token || tokens?.access_token) })
+  } catch (err) {
+    console.error('[google][status] error', err)
+    res.status(500).json({ error: 'Failed to check status' })
+  }
+})
 
-    const { client, credentials } = await setCredentials({ access_token, refresh_token })
+router.post('/availability', requireAuth, async (req, res) => {
+  try {
+    const { calendarId = 'primary', days, slotMinutes, leadMinutes, maxSlots } = req.body || {}
+    const storedTokens = await getTokensForUser(req.user.id)
+    if (!storedTokens) return res.status(404).json({ error: 'No Google tokens on file' })
+
+    const { client, credentials } = await setCredentials(storedTokens, req.user.id)
     const calendar = google.calendar({ version: 'v3', auth: client })
 
     const now = new Date()
@@ -191,24 +257,24 @@ router.post('/availability', async (req, res) => {
       maxSlots,
     })
 
-    res.json({ slots, tokens: credentials })
+    res.json({ slots })
   } catch (err) {
     console.error('[google][availability] error', err)
     res.status(500).json({ error: 'Failed to fetch availability', details: err.message })
   }
 })
 
-router.post('/book', async (req, res) => {
+router.post('/book', requireAuth, async (req, res) => {
   try {
-    const { access_token, refresh_token, calendarId = 'primary', startIso, endIso, summary = 'Hive demo', description, attendeeEmail } = req.body || {}
+    const { calendarId = 'primary', startIso, endIso, summary = 'Hive demo', description, attendeeEmail } = req.body || {}
     if (!startIso || !endIso) {
       return res.status(400).json({ error: 'startIso and endIso are required' })
     }
-    if (!access_token && !refresh_token) {
-      return res.status(400).json({ error: 'access_token or refresh_token is required' })
-    }
 
-    const { client, credentials } = await setCredentials({ access_token, refresh_token })
+    const storedTokens = await getTokensForUser(req.user.id)
+    if (!storedTokens) return res.status(404).json({ error: 'No Google tokens on file' })
+
+    const { client, credentials } = await setCredentials(storedTokens, req.user.id)
     const calendar = google.calendar({ version: 'v3', auth: client })
 
     const event = await calendar.events.insert({
@@ -232,7 +298,6 @@ router.post('/book', async (req, res) => {
     res.json({
       event: event.data,
       meetLink: event.data.hangoutLink || event.data.conferenceData?.entryPoints?.[0]?.uri,
-      tokens: credentials,
     })
   } catch (err) {
     console.error('[google][book] error', err)

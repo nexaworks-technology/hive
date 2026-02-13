@@ -1,7 +1,11 @@
 import express from 'express';
 import { supabase } from '../supabase-client.js';
+import requireAuth from '../middleware/require-auth.js';
 
 const router = express.Router();
+
+// All campaign routes require an authenticated Supabase user.
+router.use(requireAuth);
 
 // Create a campaign when the flow starts ("Generate Campaign").
 router.post('/', async (req, res) => {
@@ -11,7 +15,7 @@ router.post('/', async (req, res) => {
 
   const { data, error: dbError } = await supabase
     .from('campaigns')
-    .insert({ title: safeTitle, stage, status, payload, summary, error })
+    .insert({ title: safeTitle, stage, status, payload, summary, error, user_id: req.user.id })
     .select()
     .single();
 
@@ -24,10 +28,11 @@ router.post('/', async (req, res) => {
 });
 
 // List campaigns for sidebar/history (most recent first).
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   const { data, error: dbError } = await supabase
     .from('campaigns')
     .select('*')
+    .eq('user_id', req.user.id)
     .order('created_at', { ascending: false })
     .limit(50);
 
@@ -47,6 +52,7 @@ router.get('/:id', async (req, res) => {
     .from('campaigns')
     .select('*')
     .eq('id', id)
+    .eq('user_id', req.user.id)
     .single();
 
   if (dbError) {
@@ -66,6 +72,7 @@ router.patch('/:id', async (req, res) => {
     .from('campaigns')
     .select('payload')
     .eq('id', id)
+    .eq('user_id', req.user.id)
     .single();
 
   if (fetchError) {

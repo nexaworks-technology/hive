@@ -14,6 +14,7 @@ import HistoryView from '@/components/history-view';
 import { Header } from '@/components/header';
 import { ToastContainer } from '@/components/toast-notification';
 import { workflowManager, type WorkflowState } from '@/lib/workflow-context';
+import { RequireAuth } from '@/components/auth-provider';
 
 export default function CampaignDashboardPage() {
   const params = useParams<{ campaignId: string }>();
@@ -34,54 +35,55 @@ export default function CampaignDashboardPage() {
   }, [params?.campaignId]);
 
   useEffect(() => {
-    // if campaign id missing, bounce back to dashboard
     if (!params?.campaignId) {
       router.replace('/dashboard');
     }
   }, [params?.campaignId, router]);
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <div className="flex-1 overflow-auto">
-          <div className="p-6">
-            {activeTab === 'dashboard' ? (
-              <DashboardView />
-            ) : activeTab === 'history' ? (
-              <HistoryView />
-            ) : (
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-5 mb-6">
-                  <TabsTrigger value="stage-1">The Spark</TabsTrigger>
-                  <TabsTrigger value="stage-2">The Brain</TabsTrigger>
-                  <TabsTrigger value="stage-3">The Fuel</TabsTrigger>
-                  <TabsTrigger value="stage-4">The Spear</TabsTrigger>
-                  <TabsTrigger value="stage-5">The Closing</TabsTrigger>
-                </TabsList>
+    <RequireAuth>
+      <div className="flex h-screen bg-background">
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+          <div className="flex-1 overflow-auto">
+            <div className="p-6">
+              {activeTab === 'dashboard' ? (
+                <DashboardView />
+              ) : activeTab === 'history' ? (
+                <HistoryView />
+              ) : (
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-5 mb-6">
+                    <TabsTrigger value="stage-1">The Spark</TabsTrigger>
+                    <TabsTrigger value="stage-2">The Brain</TabsTrigger>
+                    <TabsTrigger value="stage-3">The Fuel</TabsTrigger>
+                    <TabsTrigger value="stage-4">The Spear</TabsTrigger>
+                    <TabsTrigger value="stage-5">The Closing</TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="stage-1">
-                  <StageOne />
-                </TabsContent>
-                <TabsContent value="stage-2">
-                  <StageTwo />
-                </TabsContent>
-                <TabsContent value="stage-3">
-                  <StageThree />
-                </TabsContent>
-                <TabsContent value="stage-4">
-                  <StageFour />
-                </TabsContent>
-                <TabsContent value="stage-5">
-                  <StageFive />
-                </TabsContent>
-              </Tabs>
-            )}
+                  <TabsContent value="stage-1">
+                    <StageOne />
+                  </TabsContent>
+                  <TabsContent value="stage-2">
+                    <StageTwo />
+                  </TabsContent>
+                  <TabsContent value="stage-3">
+                    <StageThree />
+                  </TabsContent>
+                  <TabsContent value="stage-4">
+                    <StageFour />
+                  </TabsContent>
+                  <TabsContent value="stage-5">
+                    <StageFive />
+                  </TabsContent>
+                </Tabs>
+              )}
+            </div>
           </div>
-        </div>
-      </main>
-      <ToastContainer />
-    </div>
+        </main>
+        <ToastContainer />
+      </div>
+    </RequireAuth>
   );
 }

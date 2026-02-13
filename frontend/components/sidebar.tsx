@@ -7,6 +7,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { workflowManager, type WorkflowState } from '@/lib/workflow-context';
+import { useSessionContext } from '@/components/auth-provider';
+import { supabase } from '@/lib/supabase-client';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   SquarePen,
   Search,
@@ -27,6 +30,7 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const router = useRouter();
+  const { session } = useSessionContext();
   const [isOpen, setIsOpen] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -36,23 +40,17 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
   const [showGoogleAuth, setShowGoogleAuth] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
-  const [googleTokens, setGoogleTokens] = useState<any>(null);
+  const [googleConnected, setGoogleConnected] = useState(false);
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
-  const loadGoogleTokens = () => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw = window.localStorage.getItem('hive-google-oauth');
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const saveGoogleTokens = (tokens: any) => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem('hive-google-oauth', JSON.stringify(tokens));
-  };
+  const profileName =
+    (session?.user?.user_metadata as any)?.full_name ||
+    (session?.user?.user_metadata as any)?.name ||
+    session?.user?.email?.split('@')[0] ||
+    'User';
+  const profileEmail = session?.user?.email;
+  const profileAvatar = (session?.user?.user_metadata as any)?.avatar_url;
+  const profileInitial = (profileName || 'U').trim().charAt(0).toUpperCase() || 'U';
 
   const handleReportBug = () => {
     const note = window.prompt('Please describe the bug');
@@ -76,15 +74,10 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   }, []);
 
   useEffect(() => {
-    setGoogleTokens(loadGoogleTokens());
-  }, []);
-
-  useEffect(() => {
     const handler = (event: MessageEvent) => {
       const data = event.data as any;
-      if (data?.type === 'hive-google-tokens' && data?.tokens) {
-        setGoogleTokens(data.tokens);
-        saveGoogleTokens(data.tokens);
+      if (data?.type === 'hive-google-connected') {
+        setGoogleConnected(true);
         setShowGoogleAuth(false);
         setActiveTab('stage-1');
         router.push('/');
@@ -98,7 +91,9 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     const loadCampaigns = async () => {
       setIsLoadingCampaigns(true);
       try {
-        const res = await fetch(`${apiBaseUrl}/campaigns`);
+        const res = await fetch(`${apiBaseUrl}/campaigns`, {
+          headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+        });
         if (!res.ok) throw new Error('Failed to fetch campaigns');
         const payload = await res.json().catch(() => ({}));
         setCampaigns(payload.campaigns || []);
@@ -109,8 +104,32 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       }
     };
 
-    loadCampaigns();
-  }, [apiBaseUrl, workflowState?.campaignHistory?.length]);
+    if (session) {
+      loadCampaigns();
+    }
+  }, [apiBaseUrl, workflowState?.campaignHistory?.length, session]);
+
+  useEffect(() => {
+    const fetchGoogleStatus = async () => {
+      if (!session) {
+        setGoogleConnected(false);
+        return;
+      }
+      try {
+        const res = await fetch(`${apiBaseUrl}/google/status`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload?.error || 'Failed to check Google status');
+        setGoogleConnected(Boolean(payload?.connected));
+      } catch (error) {
+        console.error('Failed to check Google status', error);
+        setGoogleConnected(false);
+      }
+    };
+
+    fetchGoogleStatus();
+  }, [apiBaseUrl, session]);
 
   return (
     <div
@@ -171,8 +190,11 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           variant="ghost"
           className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
           onClick={() => {
-            const tokens = loadGoogleTokens();
-            if (tokens?.access_token || tokens?.refresh_token) {
+            if (!session) {
+              router.push(`/login?redirect=${encodeURIComponent('/')}`);
+              return;
+            }
+            if (googleConnected) {
               setActiveTab('stage-1');
               router.push('/');
             } else {
@@ -230,7 +252,20 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         </div>
       </div>
 
-      <div className="p-4 space-y-2 border-t border-sidebar-border mt-auto bg-sidebar dark:bg-[#181818]">
+      <div className="p-4 space-y-3 border-t border-sidebar-border mt-auto bg-sidebar dark:bg-[#181818]">
+        <div className={`flex items-center ${isOpen ? 'justify-between gap-3' : 'justify-center'} px-1`}>
+          <div className="flex items-center gap-2">
+            <Avatar className="h-10 w-10">
+              {profileAvatar ? <AvatarImage src={profileAvatar} alt={profileName} /> : null}
+              <AvatarFallback>{profileInitial}</AvatarFallback>
+            </Avatar>
+            <div className={`${isOpen ? 'flex flex-col' : 'hidden'}`}>
+              <span className="text-sm font-semibold text-foreground leading-tight">{profileName}</span>
+              {profileEmail ? <span className="text-xs text-muted-foreground truncate max-w-[160px]">{profileEmail}</span> : null}
+            </div>
+          </div>
+        </div>
+
         <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -271,6 +306,10 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         <Button
           variant="ghost"
           className={`${isOpen ? 'w-full justify-start gap-3' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white`}
+          onClick={async () => {
+            await supabase.auth.signOut();
+            router.replace('/login');
+          }}
         >
           <LogOut className="w-8 h-8" />
           <span className={isOpen ? 'inline-flex' : 'hidden'}>Sign Out</span>
@@ -304,7 +343,9 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               onClick={async () => {
                 setIsAuthorizing(true);
                 try {
-                  const res = await fetch(`${apiBaseUrl}/google/auth-url`);
+                  const res = await fetch(`${apiBaseUrl}/google/auth-url`, {
+                    headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+                  });
                   const payload = await res.json();
                   if (!payload?.url) throw new Error('Missing auth URL');
                   window.open(payload.url, 'hive-google-consent', 'width=480,height=640');

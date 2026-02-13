@@ -15,6 +15,7 @@ import { MessageSquare, Calendar, CheckCircle2, Mail, MessageCircle, Repeat2, Vi
 import { workflowManager, type WorkflowState, type Lead, type Meeting } from '@/lib/workflow-context';
 import { toastManager } from '@/components/toast-notification';
 import { Clock } from 'lucide-react'; // Import Clock component
+import { useSessionContext } from '@/components/auth-provider';
 
 type ReplySentiment = 'Positive' | 'Negative';
 
@@ -36,6 +37,7 @@ export default function StageFive() {
   });
   const [replySendingId, setReplySendingId] = useState<string | null>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+  const { session } = useSessionContext();
 
   const persistenceLeads = workflowState?.leads.filter((lead) => !lead.replied) || []; // Define persistenceLeads variable
   const hotLeads = workflowState?.leads.filter((lead) => lead.replied && lead.sentiment === 'Very Interested') || []; // Define hotLeads variable
@@ -121,7 +123,10 @@ export default function StageFive() {
 
         await fetch(`${apiBaseUrl}/campaigns/${workflowState.currentCampaignId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
           body: JSON.stringify({
             stage: 'stage-5',
             status: 'follow-up',
@@ -138,7 +143,7 @@ export default function StageFive() {
     };
 
     persistProgress();
-  }, [apiBaseUrl, workflowState?.currentCampaignId, workflowState?.leads, workflowState?.sentEmails]);
+  }, [apiBaseUrl, session, workflowState?.currentCampaignId, workflowState?.leads, workflowState?.sentEmails]);
 
   const buildReplyDraft = (lead: Lead, sentiment: ReplySentiment) => {
     const firstName = lead.name.split(' ')[0] || 'there';

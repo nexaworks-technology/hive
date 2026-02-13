@@ -11,12 +11,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { workflowManager } from '@/lib/workflow-context';
 import { toastManager } from '@/components/toast-notification';
+import { useSessionContext } from '@/components/auth-provider';
 
 export default function StageOne() {
   const [prompt, setPrompt] = useState('');
   const [details, setDetails] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+  const { session } = useSessionContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +47,7 @@ export default function StageOne() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
         body: JSON.stringify({
           title: prompt,
