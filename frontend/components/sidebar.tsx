@@ -2,6 +2,9 @@
 
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   Brain,
@@ -20,6 +23,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const router = useRouter();
+
   const mainLinks = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   ];
@@ -145,8 +150,16 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           Settings
         </Button>
         <Button
+          onClick={async () => {
+            try {
+              await signOut(auth);
+              router.push('/login');
+            } catch (error) {
+              console.error('Sign out error:', error);
+            }
+          }}
           variant="ghost"
-          className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
+          className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
         >
           <LogOut className="w-4 h-4" />
           Sign Out
