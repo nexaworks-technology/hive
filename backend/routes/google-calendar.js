@@ -10,6 +10,9 @@ const router = express.Router()
 const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.modify',
 ]
 const DEFAULT_SLOT_MINUTES = 30
 const DEFAULT_LOOKAHEAD_DAYS = 7
@@ -47,7 +50,7 @@ const getOAuthClient = () => {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri)
 }
 
-const getTokensForUser = async (userId) => {
+export const getTokensForUser = async (userId) => {
   const { data, error } = await supabase
     .from('google_tokens')
     .select('access_token, refresh_token, scope, expiry_date, token_type')
@@ -148,7 +151,7 @@ router.get('/callback', async (req, res) => {
   }
 })
 
-const setCredentials = async (tokens, userId) => {
+export const setCredentials = async (tokens, userId) => {
   const client = getOAuthClient()
   client.setCredentials(tokens)
 
