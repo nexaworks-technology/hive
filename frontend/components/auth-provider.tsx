@@ -12,6 +12,7 @@ interface SessionContextValue {
   refresh: () => Promise<void>;
 }
 
+
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
