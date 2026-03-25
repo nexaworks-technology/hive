@@ -231,7 +231,7 @@ router.post('/availability', requireAuth, async (req, res) => {
     const storedTokens = await getTokensForUser(req.user.id)
     if (!storedTokens) return res.status(404).json({ error: 'No Google tokens on file' })
 
-    const { client, credentials } = await setCredentials(storedTokens, req.user.id)
+    const { client } = await setCredentials(storedTokens, req.user.id)
     const calendar = google.calendar({ version: 'v3', auth: client })
 
     const now = new Date()
@@ -277,7 +277,7 @@ router.post('/book', requireAuth, async (req, res) => {
     const storedTokens = await getTokensForUser(req.user.id)
     if (!storedTokens) return res.status(404).json({ error: 'No Google tokens on file' })
 
-    const { client, credentials } = await setCredentials(storedTokens, req.user.id)
+    const { client } = await setCredentials(storedTokens, req.user.id)
     const calendar = google.calendar({ version: 'v3', auth: client })
 
     const event = await calendar.events.insert({
