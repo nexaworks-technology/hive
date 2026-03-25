@@ -9,8 +9,34 @@ import inboundRouter from './modules/inbound/inbound.routes.js';
 const app = express();
 const port = process.env.PORT || 4000;
 
-app.use(cors());
-app.use(express.json());
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+// Allowed origins — extend this list for additional domains / local dev ports
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+// Always allow localhost for local dev
+const DEFAULT_DEV_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+];
+
+const allAllowedOrigins = [...new Set([...DEFAULT_DEV_ORIGINS, ...ALLOWED_ORIGINS])];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. curl, Postman, server-to-server)
+      if (!origin) return callback(null, true);
+      if (allAllowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
+    credentials: true,
+  })
+);
+
+app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });

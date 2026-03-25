@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: hive-backend
+    env: node
+    region: oregon   # or singapore if you want lower latency from India
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node src/app.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000          # Render assigns this automatically; kept here for clarity
+      - key: ALLOWED_ORIGINS
+        value: https://hivedemo.nexaworks.tech
+      # ── Fill these in Render dashboard (do NOT commit real values) ──
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
