@@ -1,8 +1,8 @@
 import express from 'express'
 import crypto from 'node:crypto'
 import { google } from 'googleapis'
-import { supabase } from '../supabase-client.js'
-import requireAuth from '../middleware/require-auth.js'
+import { supabase } from '../../config/supabase.js'
+import requireAuth from '../../middlewares/require-auth.js'
 
 const router = express.Router()
 

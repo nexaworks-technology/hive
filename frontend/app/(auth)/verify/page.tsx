@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { toastManager } from '@/components/toast-notification'
 
-export default function VerifyPage() {
+function VerifyContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
@@ -81,48 +81,71 @@ export default function VerifyPage() {
   }
 
   return (
+    <Card className="w-full max-w-md p-6 space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground">Verify your email</h1>
+        <p className="text-sm text-muted-foreground">Enter the 6-digit code we sent to your inbox</p>
+      </div>
+      <form className="space-y-4" onSubmit={onVerify}>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder="you@company.com"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="code">Verification code</Label>
+          <Input
+            id="code"
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            required
+            inputMode="numeric"
+            pattern="[0-9]*"
+            placeholder="123456"
+          />
+        </div>
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? 'Verifying...' : 'Verify and continue'}
+        </Button>
+      </form>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>Didn’t get the code?</span>
+        <Button variant="ghost" size="sm" onClick={onResend} disabled={resending}>
+          {resending ? 'Sending…' : 'Resend code'}
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
+export default function VerifyPage() {
+  return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-md p-6 space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Verify your email</h1>
-          <p className="text-sm text-muted-foreground">Enter the 6-digit code we sent to your inbox</p>
-        </div>
-        <form className="space-y-4" onSubmit={onVerify}>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="you@company.com"
-            />
+      <Suspense fallback={
+        <Card className="w-full max-w-md p-6 space-y-4">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-muted rounded w-1/2"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-muted rounded w-1/4"></div>
+              <div className="h-10 bg-muted rounded"></div>
+            </div>
+            <div className="space-y-2">
+              <div className="h-4 bg-muted rounded w-1/4"></div>
+              <div className="h-10 bg-muted rounded"></div>
+            </div>
+            <div className="h-10 bg-muted rounded"></div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="code">Verification code</Label>
-            <Input
-              id="code"
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              required
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="123456"
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Verifying...' : 'Verify and continue'}
-          </Button>
-        </form>
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>Didn’t get the code?</span>
-          <Button variant="ghost" size="sm" onClick={onResend} disabled={resending}>
-            {resending ? 'Sending…' : 'Resend code'}
-          </Button>
-        </div>
-      </Card>
+        </Card>
+      }>
+        <VerifyContent />
+      </Suspense>
     </div>
   )
 }

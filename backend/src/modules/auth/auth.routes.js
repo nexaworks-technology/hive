@@ -1,7 +1,7 @@
 import express from 'express'
 import crypto from 'node:crypto'
 import nodemailer from 'nodemailer'
-import { supabase } from '../supabase-client.js'
+import { supabase } from '../../config/supabase.js'
 
 const router = express.Router()
 
@@ -22,31 +22,6 @@ const transporter = nodemailer.createTransport({
   auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
 })
 
-const freeDomains = new Set([
-  'gmail.com',
-  'outlook.com',
-  'hotmail.com',
-  'yahoo.com',
-  'icloud.com',
-  'aol.com',
-  'proton.me',
-  'protonmail.com',
-  'gmx.com',
-  'gmx.de',
-  'mail.com',
-  'yandex.com',
-  'yandex.ru',
-  'zoho.com',
-  'pm.me',
-  'live.com',
-  'msn.com',
-])
-
-const isBusinessEmail = (email) => {
-  const domain = email.split('@')[1]?.toLowerCase()
-  if (!domain) return false
-  return !freeDomains.has(domain)
-}
 
 const generateCode = () => {
   const num = crypto.randomInt(0, 1_000_000)
@@ -69,9 +44,9 @@ const sendVerificationEmail = async ({ to, code }) => {
 }
 
 const findUserByEmail = async (email) => {
-  const { data, error } = await supabase.auth.admin.getUserByEmail(email)
+  const { data: { users }, error } = await supabase.auth.admin.listUsers()
   if (error) throw error
-  return data?.user || null
+  return users.find(user => (user.email ?? '').toLowerCase() === email.toLowerCase()) || null
 }
 
 const markExistingCodesConsumed = async (userId) => {
@@ -102,9 +77,6 @@ router.post('/signup', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'email and password are required' })
 
     const trimmedEmail = String(email).trim().toLowerCase()
-    if (!isBusinessEmail(trimmedEmail)) {
-      return res.status(400).json({ error: 'Use your work email (no personal domains)' })
-    }
 
     const existingUser = await findUserByEmail(trimmedEmail)
     if (existingUser && userAlreadyConfirmed(existingUser)) {

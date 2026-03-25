@@ -1,4 +1,4 @@
-import { supabase } from '../supabase-client.js'
+import { supabase } from '../config/supabase.js'
 
 export async function requireAuth(req, res, next) {
   try {

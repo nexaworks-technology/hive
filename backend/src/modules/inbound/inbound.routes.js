@@ -1,11 +1,11 @@
 import express from 'express';
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
-import { supabase } from '../supabase-client.js';
-import requireAuth from '../middleware/require-auth.js';
+import { supabase } from '../../config/supabase.js';
+import requireAuth from '../../middlewares/require-auth.js';
 import { google } from 'googleapis';
 import crypto from 'node:crypto';
-import { getTokensForUser, setCredentials } from './google-calendar.js';
+import { getTokensForUser, setCredentials } from '../google/google.routes.js';
 
 const router = express.Router();
 
@@ -639,35 +639,40 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
       const gMessages = response.data.messages || [];
       console.log(`[inbound][check-replies] ${gMessages.length} unread email(s) found via Gmail API`);
 
-      for (const gMsg of gMessages) {
-        try {
-          const msgData = await gmail.users.messages.get({ userId: 'me', id: gMsg.id, format: 'raw' });
-          const raw = Buffer.from(msgData.data.raw, 'base64url').toString('utf-8');
-          const parsed = await simpleParser(raw);
+      // ⚡ Fetch all messages in parallel instead of sequentially
+      const fetchedMessages = await Promise.all(
+        gMessages.map(async (gMsg) => {
+          try {
+            const msgData = await gmail.users.messages.get({ userId: 'me', id: gMsg.id, format: 'raw' });
+            const raw = Buffer.from(msgData.data.raw, 'base64url').toString('utf-8');
+            const parsed = await simpleParser(raw);
 
-          const fromEmail = parsed.from?.value?.[0]?.address?.toLowerCase();
-          const replyText = parsed.text || parsed.html?.replace(/<[^>]+>/g, '') || '';
-          const emailSubject = parsed.subject || '';
+            const fromEmail = parsed.from?.value?.[0]?.address?.toLowerCase();
+            const replyText = parsed.text || parsed.html?.replace(/<[^>]+>/g, '') || '';
+            const emailSubject = parsed.subject || '';
 
-          if (!fromEmail || !replyText.trim()) continue;
+            if (!fromEmail || !replyText.trim()) return null;
 
-          unreadMessages.push({
-            uid: gMsg.id,
-            fromEmail,
-            replyText,
-            emailSubject,
-            markSeen: async () => {
-              await gmail.users.messages.modify({
-                userId: 'me',
-                id: gMsg.id,
-                requestBody: { removeLabelIds: ['UNREAD'] }
-              });
-            }
-          });
-        } catch (err) {
-          console.error(`[inbound][check-replies] error processing gmail msg id ${gMsg.id}:`, err.message);
-        }
-      }
+            return {
+              uid: gMsg.id,
+              fromEmail,
+              replyText,
+              emailSubject,
+              markSeen: async () => {
+                await gmail.users.messages.modify({
+                  userId: 'me',
+                  id: gMsg.id,
+                  requestBody: { removeLabelIds: ['UNREAD'] }
+                });
+              }
+            };
+          } catch (err) {
+            console.error(`[inbound][check-replies] error processing gmail msg id ${gMsg.id}:`, err.message);
+            return null;
+          }
+        })
+      );
+      fetchedMessages.filter(Boolean).forEach((m) => unreadMessages.push(m));
     } catch (err) {
       console.error('[inbound][check-replies] Gmail API error:', err.message);
       return res.status(500).json({ error: `Gmail API connection failed: ${err.message}` });
@@ -700,30 +705,35 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
       const uids = await imapClient.search({ seen: false });
       console.log(`[inbound][check-replies] ${uids.length} unread email(s) found via IMAP`);
 
-      for (const uid of uids) {
-        try {
-          const msgBytes = await imapClient.fetchOne(uid, { source: true });
-          const parsed = await simpleParser(msgBytes.source);
+      // ⚡ Fetch all IMAP messages in parallel
+      const imapFetched = await Promise.all(
+        uids.map(async (uid) => {
+          try {
+            const msgBytes = await imapClient.fetchOne(uid, { source: true });
+            const parsed = await simpleParser(msgBytes.source);
 
-          const fromEmail = parsed.from?.value?.[0]?.address?.toLowerCase();
-          const replyText = parsed.text || parsed.html?.replace(/<[^>]+>/g, '') || '';
-          const emailSubject = parsed.subject || '';
+            const fromEmail = parsed.from?.value?.[0]?.address?.toLowerCase();
+            const replyText = parsed.text || parsed.html?.replace(/<[^>]+>/g, '') || '';
+            const emailSubject = parsed.subject || '';
 
-          if (!fromEmail || !replyText.trim()) continue;
+            if (!fromEmail || !replyText.trim()) return null;
 
-          unreadMessages.push({
-            uid: String(uid),
-            fromEmail,
-            replyText,
-            emailSubject,
-            markSeen: async () => {
-              await imapClient.messageFlagsAdd(uid, ['\\Seen']);
-            }
-          });
-        } catch (msgErr) {
-          console.error(`[inbound][check-replies] error processing imap uid ${uid}:`, msgErr.message);
-        }
-      }
+            return {
+              uid: String(uid),
+              fromEmail,
+              replyText,
+              emailSubject,
+              markSeen: async () => {
+                await imapClient.messageFlagsAdd(uid, ['\\Seen']);
+              }
+            };
+          } catch (msgErr) {
+            console.error(`[inbound][check-replies] error processing imap uid ${uid}:`, msgErr.message);
+            return null;
+          }
+        })
+      );
+      imapFetched.filter(Boolean).forEach((m) => unreadMessages.push(m));
     } catch (imapErr) {
       console.error('[inbound][check-replies] IMAP error:', imapErr.message);
       if (imapClient) { try { await imapClient.logout(); } catch {} }
@@ -731,68 +741,68 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
     }
   }
 
-  // 3. Process unread matching messages
-  for (const msg of unreadMessages) {
-    const { uid, fromEmail, replyText, emailSubject, markSeen } = msg;
+  // 3. Process matched replies — ⚡ all in parallel (AI classify + send)
+  await Promise.all(
+    unreadMessages.map(async (msg) => {
+      const { uid, fromEmail, replyText, emailSubject, markSeen } = msg;
 
-    const leadIdx = leadsByEmail[fromEmail];
-    if (leadIdx === undefined) {
-      console.log(`[inbound][check-replies] msg uid ${uid} — sender ${fromEmail} not in campaign, skipping`);
-      continue;
-    }
-
-    const lead = updatedLeads[leadIdx];
-
-    if (lead.replyReceivedAt) {
-      console.log(`[inbound][check-replies] lead ${fromEmail} already has a reply recorded, skipping`);
-      await markSeen();
-      continue;
-    }
-
-    console.log(`[inbound][check-replies] matched reply from ${fromEmail} (lead: ${lead.name})`);
-    await markSeen();
-
-    let intent = 'question';
-    let replySubject = `Re: ${emailSubject || lead.emailSubject || 'Following up'}`;
-    let replyBody = '';
-
-    try {
-      const aiResult = await classifyAndDraftReply({
-        lead,
-        replyText: replyText.trim().slice(0, 2000), // limit context
-        originalSubject: lead.emailSubject,
-        originalBody: lead.emailBody,
-        settings,
-      });
-      intent = aiResult.intent || 'question';
-      replySubject = aiResult.replySubject || replySubject;
-      replyBody = aiResult.replyBody || '';
-
-      if (settings.bookingLink) {
-        replyBody = replyBody.replace(/\[(?:calendar[\s_-]*link|booking[\s_-]*link)\]/ig, settings.bookingLink);
+      const leadIdx = leadsByEmail[fromEmail];
+      if (leadIdx === undefined) {
+        console.log(`[inbound][check-replies] msg uid ${uid} — sender ${fromEmail} not in campaign, skipping`);
+        return;
       }
-    } catch (aiErr) {
-      console.error(`[inbound][check-replies] AI classify failed for ${fromEmail}:`, aiErr.message);
-      // fallback reply
-      replyBody = `Hi ${lead.name?.split(' ')[0] || lead.name},\n\nThanks for getting back to me! Let me know a good time to connect.\n\n${settings.agencyName || ''}`;
-    }
 
-    let autoReplySent = false;
-    let autoReplyError = null;
-    try {
-      await sendEmail({
-        to: lead.email,
-        subject: replySubject,
-        body: replyBody,
-        fromName: settings.agencyName || '',
-        userId: req.user.id,
-      });
-      autoReplySent = true;
-      console.log(`[inbound][check-replies] auto-reply sent to ${fromEmail} (intent: ${intent})`);
-    } catch (sendErr) {
-      autoReplyError = sendErr.message;
-      console.error(`[inbound][check-replies] auto-reply send failed for ${fromEmail}:`, sendErr.message);
-    }
+      const lead = updatedLeads[leadIdx];
+
+      if (lead.replyReceivedAt) {
+        console.log(`[inbound][check-replies] lead ${fromEmail} already has a reply recorded, skipping`);
+        await markSeen();
+        return;
+      }
+
+      console.log(`[inbound][check-replies] matched reply from ${fromEmail} (lead: ${lead.name})`);
+      await markSeen();
+
+      let intent = 'question';
+      let replySubject = `Re: ${emailSubject || lead.emailSubject || 'Following up'}`;
+      let replyBody = '';
+
+      try {
+        const aiResult = await classifyAndDraftReply({
+          lead,
+          replyText: replyText.trim().slice(0, 2000),
+          originalSubject: lead.emailSubject,
+          originalBody: lead.emailBody,
+          settings,
+        });
+        intent = aiResult.intent || 'question';
+        replySubject = aiResult.replySubject || replySubject;
+        replyBody = aiResult.replyBody || '';
+
+        if (settings.bookingLink) {
+          replyBody = replyBody.replace(/\[(?:calendar[\s_-]*link|booking[\s_-]*link)\]/ig, settings.bookingLink);
+        }
+      } catch (aiErr) {
+        console.error(`[inbound][check-replies] AI classify failed for ${fromEmail}:`, aiErr.message);
+        replyBody = `Hi ${lead.name?.split(' ')[0] || lead.name},\n\nThanks for getting back to me! Let me know a good time to connect.\n\n${settings.agencyName || ''}`;
+      }
+
+      let autoReplySent = false;
+      let autoReplyError = null;
+      try {
+        await sendEmail({
+          to: lead.email,
+          subject: replySubject,
+          body: replyBody,
+          fromName: settings.agencyName || '',
+          userId: req.user.id,
+        });
+        autoReplySent = true;
+        console.log(`[inbound][check-replies] auto-reply sent to ${fromEmail} (intent: ${intent})`);
+      } catch (sendErr) {
+        autoReplyError = sendErr.message;
+        console.error(`[inbound][check-replies] auto-reply send failed for ${fromEmail}:`, sendErr.message);
+      }
 
     updatedLeads[leadIdx] = {
       ...lead,
@@ -809,15 +819,16 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
       meetingBooked: intent === 'positive' ? lead.meetingBooked : lead.meetingBooked,
     };
 
-    newReplies.push({
-      leadId: lead.id,
-      leadName: lead.name,
-      leadEmail: fromEmail,
-      intent,
-      replyText: replyText.trim().slice(0, 500),
-      autoReplySent,
-    });
-  }
+      newReplies.push({
+        leadId: lead.id,
+        leadName: lead.name,
+        leadEmail: fromEmail,
+        intent,
+        replyText: replyText.trim().slice(0, 500),
+        autoReplySent,
+      });
+    })
+  );
 
   if (imapClient) {
     try { await imapClient.logout(); console.log('[inbound][check-replies] IMAP disconnected'); } catch (e) {}
@@ -842,5 +853,46 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
   });
 });
 
+/**
+ * GET /inbound/campaigns
+ * List all inbound campaigns for the current user with summary stats.
+ */
+router.get('/campaigns', requireAuth, async (req, res) => {
+  try {
+    const { data: rows, error } = await supabase
+      .from('campaigns')
+      .select('id, title, created_at, status, payload')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    const campaigns = (rows || [])
+      .filter((r) => r.payload?.type === 'inbound')
+      .map((r) => {
+        const leads = r.payload?.leads || [];
+        return {
+          campaignId: r.id,
+          title: r.title,
+          createdAt: r.created_at,
+          status: r.status,
+          settings: r.payload?.settings || {},
+          stats: {
+            total: leads.length,
+            sent: leads.filter((l) => l.emailSent).length,
+            replied: leads.filter((l) => l.replied).length,
+            booked: leads.filter((l) => l.meetingBooked).length,
+          },
+        };
+      });
+
+    return res.json({ campaigns });
+  } catch (err) {
+    console.error('[inbound][list-campaigns] error', err);
+    return res.status(500).json({ error: err.message || 'Failed to list campaigns' });
+  }
+});
+
 export default router;
+
 
