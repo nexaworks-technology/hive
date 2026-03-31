@@ -50,8 +50,13 @@ export default function CampaignModal({ isOpen, onClose }: CampaignModalProps) {
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to create campaign');
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to create campaign');
+      }
 
+      const responseData = await res.json();
+      
       toast({
         title: 'Campaign created',
         description: `${formData.targetCompany} campaign is ready to go!`,
