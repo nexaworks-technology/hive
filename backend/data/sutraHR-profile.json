@@ -1,0 +1,160 @@
+{
+  "company": {
+    "name": "SutraHR",
+    "website": "https://www.sutrahr.com",
+    "founded": "2010",
+    "experience": "15+ years",
+    "employees": "Unknown",
+    "headquarters": "India (Mumbai, Delhi, Bangalore, Hyderabad)",
+    "globalPresence": ["US", "UK", "Europe", "Middle East", "Canada", "Australia", "APAC", "Dubai"]
+  },
+  "businessModel": {
+    "type": "Global recruitment agency",
+    "tagline": "Pay Once. Hire Unlimited Candidates",
+    "core": "Dedicated Resource Model - provides dedicated recruiters as extension of client teams",
+    "vs_traditional": {
+      "sutraHR": "Pay once, hire unlimited, specialized tools & resources, faster & efficient",
+      "traditional": "Pay per candidate, limited resource & expertise, cost & time consuming"
+    }
+  },
+  "valueProposition": [
+    "Global Talent Access - India's vast pool of highly skilled startup-ready professionals",
+    "Startup & Scale-Up Hiring Experts - specialized in startup hiring across tech & non-tech",
+    "Proven International Experience - trusted by global companies across multiple regions",
+    "Cost-Effective Global Hiring - no yearly contracts, no per-hire fees",
+    "Faster Time-to-Hire - fastest cross-border recruitment service",
+    "Guarantee Closure - guaranteed closures within 21 days"
+  ],
+  "targetMarket": {
+    "primarySegments": [
+      "Global startups (Series A-C)",
+      "Scale-ups",
+      "Enterprises needing global team building"
+    ],
+    "geographies": ["North America", "Europe", "Middle East", "APAC"],
+    "companySize": "1M+ ARR companies"
+  },
+  "icp": {
+    "description": "Global, fast-growing tech startups & enterprises needing to build distributed teams from India",
+    "characteristics": {
+      "stage": ["Series A", "Series B", "Series C", "Post-Series C", "Enterprises"],
+      "size": ["Small (10-50)", "Mid-market (50-500)", "Enterprise (500+)"],
+      "growth": "Rapidly expanding remote/international teams",
+      "painpoint": "Need skilled talent fast, cost-effectively, without long-term contracts",
+      "use_case": "Build distributed teams, rapid hiring for growth, specialized role filling"
+    },
+    "industry_focus": [
+      "SaaS & B2B Technology",
+      "Fintech & Neo-Banking",
+      "Healthtech & Healthcare IT",
+      "E-commerce & D2C",
+      "AI, Data Science & Engineering",
+      "Digital Media & Marketing"
+    ]
+  },
+  "hiringRoles": {
+    "tech": [
+      "Backend Developer / Node.js / Java Programmer",
+      "Frontend Developer / React Developer",
+      "Full Stack Engineer",
+      "Mobile (Android/iOS) Developer",
+      "React Native Developer",
+      "Blockchain Developer",
+      "Data Engineer",
+      "Data Scientist",
+      "DevOps Engineer",
+      "QA Engineer / QA Lead",
+      "Tech Lead / CTO",
+      "Product Manager / VP Product"
+    ],
+    "nonTech": [
+      "UI/UX Designer",
+      "Product Manager",
+      "Project Manager",
+      "Business Development Manager",
+      "Sales Director / Sales Manager",
+      "Creative Director",
+      "Digital Marketing Manager / SEO Manager / SEM Head",
+      "Content Editor / Writer",
+      "Customer Service Head",
+      "Key Account Manager",
+      "HR Head / Manager",
+      "Category Manager / Head",
+      "CFO / Head Finance",
+      "Business Head"
+    ]
+  },
+  "recentClients": [
+    "Repurpose.io",
+    "Rare Carat",
+    "Leena.ai",
+    "Sortly",
+    "Volane",
+    "Trustvid.ai",
+    "Alkimi",
+    "SavvyMoney",
+    "Celigo",
+    "Xneeti",
+    "Superfone",
+    "WoCo",
+    "Dunzo"
+  ],
+  "socialProof": [
+    {
+      "client": "Socialtip (James Watt, Founder & CEO)",
+      "quote": "What stood out was their clarity and ownership. SutraHR didn't just send resumes, they solved our hiring problems."
+    },
+    {
+      "client": "Leena.ai (Adit Jain, Co-Founder & CEO)",
+      "quote": "SutraHR understood our hiring urgency from day one. They moved fast, shared only relevant profiles, and helped us scale without wasting time."
+    },
+    {
+      "client": "Rare Carat (Ajay Anand, Founder)",
+      "quote": "Speed and quality rarely come together, but SutraHR delivered both. Their team became an extension of ours during critical hiring phases."
+    }
+  ],
+  "processFlow": [
+    "Requirement Discovery: Role, time zone, budget & cultural fit",
+    "India-Based Talent Sourcing: Deep search across India's top talent networks",
+    "Skill & Communication Screening: Only relevant, vetted profiles",
+    "Interview Coordination: Fast, structured interview cycles",
+    "Offer & Closure: Guaranteed closure within 3 weeks",
+    "Onboarding & Support: Remote, relocation, or hybrid assistance"
+  ],
+  "stats": {
+    "timesWorkedWith": "10,000+ companies served",
+    "positionsClosedAllTime": "5,000+",
+    "guaranteedClosureTime": "21 days"
+  },
+  "marketingAngles": [
+    "India talent pool expertise",
+    "Startup-focused approach",
+    "Global remote team building",
+    "Cost efficiency",
+    "Speed of hiring",
+    "Dedicated recruiter model",
+    "Mission-driven approach"
+  ],
+  "emailDraftContexts": {
+    "jobSeekerPitch": "Need to hire multiple people for your <specific_role>? Let me connect you with SutraHR's network of pre-vetted talent from India. They've helped Rare Carat, Leena.ai, and Repurpose.io scale their teams in weeks, not months.",
+    "sellerPitch": "Are you hiring developers for your SaaS? SutraHR has built a dedicated model specifically for startups like yours - get a dedicated recruiter for unlimited hires instead of paying per candidate.",
+    "recruiterCollab": "Looking to partner with someone who understands global startup hiring? SutraHR's network has helped scale 10,000+ companies. They'd be perfect for sourcing your specialty roles.",
+    "partnershipAngle": "SutraHR's Dedicated Resource Model transforms how startups hire remotely. If you're in fintech/e-commerce/AI, they're the obvious partner for your team expansion."
+  },
+  "competitiveAdvantages": [
+    "Dedicated resource model (not transactional)",
+    "Deep India talent network",
+    "Startup hiring expertise",
+    "Guaranteed closure timeline",
+    "No long-term contracts",
+    "Global footprint with local sourcing",
+    "Skilled in both tech and non-tech roles"
+  ],
+  "contentIdeas": [
+    "Case studies: How SutraHR helped companies like Rare Carat, Leena.ai scale 3-5x",
+    "Comparison: Dedicated recruiting vs. traditional per-hire agencies",
+    "India tech talent deep dive: Why India's startup community dominates global hiring",
+    "Remote team building guide: Best practices for distributed teams",
+    "Founder interviews: How founders use SutraHR for rapid scaling"
+  ]
+}
