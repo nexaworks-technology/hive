@@ -250,6 +250,17 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           </Button>
           <Button
             variant="ghost"
+            className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
+            onClick={() => {
+              setActiveTab('campaigns');
+              router.push('/campaigns');
+            }}
+          >
+            <Mail className="w-8 h-8" />
+            <span className={isOpen ? 'inline-flex' : 'hidden'}>Outbound Campaigns</span>
+          </Button>
+          <Button
+            variant="ghost"
             className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-[#0a66c2] dark:text-[#70b5f9] hover:bg-[#0a66c2]/10 dark:hover:bg-[#70b5f9]/10 hover:text-[#0a66c2] dark:hover:text-[#70b5f9] transition-shadow`}
             onClick={() => {
               setActiveTab('linkedin');
