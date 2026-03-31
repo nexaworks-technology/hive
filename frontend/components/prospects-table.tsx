@@ -147,7 +147,7 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
         </table>
       </div>
 
-      {showProspectModal && selectedProspect && (
+      {selectedProspect && (
         <ProspectModal
           prospect={selectedProspect}
           campaignId={campaignId}
@@ -157,17 +157,15 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
         />
       )}
 
-      {showEmailComposer && (
-        <EmailComposer
-          prospectId={showEmailComposer}
-          campaignId={campaignId}
-          isOpen={!!showEmailComposer}
-          onClose={() => {
-            setShowEmailComposer(null);
-            fetchProspects();
-          }}
-        />
-      )}
+      <EmailComposer
+        prospectId={showEmailComposer || ''}
+        campaignId={campaignId}
+        isOpen={!!showEmailComposer}
+        onClose={() => {
+          setShowEmailComposer(null);
+          fetchProspects();
+        }}
+      />
     </div>
   );
 }

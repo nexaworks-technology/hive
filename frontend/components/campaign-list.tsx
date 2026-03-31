@@ -60,15 +60,13 @@ export default function CampaignList({ onSelectCampaign }: CampaignListProps) {
         <Button onClick={() => setShowCreateModal(true)}>+ New Campaign</Button>
       </div>
 
-      {showCreateModal && (
-        <CampaignModal
-          isOpen={showCreateModal}
-          onClose={() => {
-            setShowCreateModal(false);
-            fetchCampaigns();
-          }}
-        />
-      )}
+      <CampaignModal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          fetchCampaigns();
+        }}
+      />
 
       {loading ? (
         <p className="text-center text-gray-500">Loading campaigns...</p>
