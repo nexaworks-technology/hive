@@ -236,8 +236,24 @@ router.get('/:campaignId/stats', (req, res) => {
   try {
     const { campaignId } = req.params;
     const result = campaignManager.getCampaignStats(campaignId);
-
-    res.json(result);
+    
+    // Flatten the stats structure for the frontend
+    if (result.success && result.stats) {
+      const flatStats = {
+        ...result.stats,
+        totalProspects: result.stats.prospectCount,
+        emailsSent: result.stats.emailsSent,
+        replies: result.stats.repliesReceived,
+        followUpsScheduled: result.stats.followUpsScheduled,
+        replyRate: parseInt(result.stats.conversionMetrics.replyRate) || 0,
+        responseRate: result.stats.conversionMetrics.responseRate,
+        avgEmailsPerProspect: parseFloat(result.stats.conversionMetrics.avgEmailsPerProspect) || 0
+      };
+      
+      res.json({ success: true, stats: flatStats });
+    } else {
+      res.json(result);
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
