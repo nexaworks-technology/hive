@@ -2,14 +2,16 @@ import express from 'express';
 import campaignManager from '../utils/campaign-manager.js';
 import companyInsights from '../utils/company-insights.js';
 import leadQualifier from '../utils/lead-qualifier.js';
+import { chromium } from 'playwright';
+import scrapeLeadsRouter, { searchCompanies, fetchHunterLead, fetchMetaFromSite } from './scrape-leads.js';
 
 const router = express.Router();
 
 /**
  * POST /campaigns/create
- * Create a new outbound campaign
+ * Create a new outbound campaign with auto-scraped prospects
  */
-router.post('/create', (req, res) => {
+router.post('/create', async (req, res) => {
   try {
     const campaignData = req.body;
     
@@ -31,8 +33,69 @@ router.post('/create', (req, res) => {
       });
     }
 
+    // Create the campaign
     const result = campaignManager.createCampaign(campaignData);
+    
+    if (!result.success) {
+      return res.json(result);
+    }
 
+    const campaign = result.campaign;
+
+    // Auto-scrape prospects for the target company in the background
+    // Don't wait for this - return the campaign immediately
+    (async () => {
+      try {
+        const query = `${campaignData.targetCompany} company website`;
+        console.log(`[campaigns-v2] Auto-scraping prospects for: ${query}`);
+        
+        const domains = await searchCompanies(query);
+        const browser = await chromium.launch({ headless: true });
+        const scrapedLeads = [];
+
+        try {
+          for (const domain of domains.slice(0, 10)) {
+            let hunterLead = null;
+            try {
+              hunterLead = await fetchHunterLead(domain);
+            } catch (err) {
+              console.warn(`[campaigns-v2] Hunter error for ${domain}:`, err.message);
+            }
+
+            let siteTitle = null;
+            try {
+              siteTitle = await fetchMetaFromSite(domain, browser);
+            } catch (err) {
+              console.warn(`[campaigns-v2] Playwright error for ${domain}:`, err.message);
+            }
+
+            if (hunterLead) {
+              scrapedLeads.push({
+                name: hunterLead.name,
+                email: hunterLead.email,
+                title: hunterLead.position || 'Unknown',
+                company: siteTitle || domain,
+                linkedin: hunterLead.linkedin || `https://www.google.com/search?q=${encodeURIComponent(hunterLead.name + ' ' + domain)}`,
+                industry: ''
+              });
+            }
+          }
+        } finally {
+          await browser.close();
+        }
+
+        // Add scraped leads to campaign
+        if (scrapedLeads.length > 0) {
+          const addResult = campaignManager.addProspectsFromScrapedLeads(campaign.id, scrapedLeads);
+          console.log(`[campaigns-v2] Added ${addResult.totalAdded} prospects to campaign ${campaign.id}`);
+        }
+      } catch (err) {
+        console.error('[campaigns-v2] Auto-scraping error:', err.message);
+        // Continue - scraping failure shouldn't block campaign creation
+      }
+    })();
+
+    // Return the campaign immediately (prospects will be added asynchronously)
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });

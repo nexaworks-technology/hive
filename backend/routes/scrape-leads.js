@@ -171,4 +171,7 @@ router.post('/', async (req, res) => {
   return res.json({ leads });
 });
 
+// Export functions for reuse in other modules
+export { searchCompanies, fetchHunterLead, fetchMetaFromSite };
+
 export default router;

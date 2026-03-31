@@ -517,6 +517,56 @@ class CampaignManager {
   }
 
   /**
+   * Add prospects from web-scraped leads
+   * Transforms scraped data into prospect format and adds to campaign
+   */
+  addProspectsFromScrapedLeads(campaignId, scrapedLeads) {
+    const campaign = this.campaigns.get(campaignId);
+    if (!campaign) {
+      return { success: false, error: 'Campaign not found' };
+    }
+
+    const added = [];
+    const errors = [];
+
+    scrapedLeads.forEach((lead, index) => {
+      try {
+        // Transform scraped lead to prospect format
+        const prospectData = {
+          name: lead.name,
+          email: lead.email,
+          role: lead.title || 'Unknown',
+          company: lead.company || campaign.targetCompany,
+          linkedinProfile: lead.linkedin,
+          personalizationInfo: {
+            source: 'web-scrape',
+            scrapedAt: new Date().toISOString(),
+            industry: lead.industry
+          }
+        };
+
+        const result = this.addProspect(campaignId, prospectData);
+        if (result.success) {
+          added.push(result.prospect);
+        } else {
+          errors.push({ index, error: result.error, lead: lead.name });
+        }
+      } catch (err) {
+        errors.push({ index, error: err.message, lead: lead.name });
+      }
+    });
+
+    return {
+      success: true,
+      totalAdded: added.length,
+      totalErrors: errors.length,
+      prospects: added,
+      errors: errors.length > 0 ? errors : undefined,
+      campaignProspectCount: campaign.prospectCount
+    };
+  }
+
+  /**
    * Get all campaigns
    */
   getAllCampaigns() {
