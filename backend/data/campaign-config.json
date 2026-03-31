@@ -1,0 +1,113 @@
+{
+  "linkedinSearchStrategies": {
+    "hiringSignals": {
+      "general": [
+        "(\"hiring\" OR \"growing our team\" OR \"we are hiring\" OR \"now hiring\" OR \"actively hiring\") AND (\"engineers\" OR \"developers\" OR \"tech\")",
+        "(\"scaling\" OR \"expanding\" OR \"building out\") AND (\"engineering team\" OR \"tech team\")",
+        "(\"referrals\" OR \"recruitment\") AND (\"open positions\" OR \"open roles\")"
+      ],
+      "byRole": {
+        "cto": "\"CTO\" OR \"Chief Technology Officer\" AND (\"hiring\" OR \"looking for\")",
+        "vpEng": "(\"VP of Engineering\" OR \"VP Engineering\" OR \"VP, Engineering\") AND (\"hiring\" OR \"scaling\")",
+        "founder": "\"Founder\" OR \"Co-founder\" AND (\"Series A\" OR \"Series B\" OR \"hiring\")",
+        "headTalent": "(\"Head of Talent\" OR \"Head of Recruiting\" OR \"Talent Acquisition\") AND \"hiring\""
+      },
+      "fundingTrigger": [
+        "(\"Series A\" OR \"Series B\" OR \"Seed\") AND \"thrilled to announce\",raised funding",
+        "\"just announced\" AND (\"Series A\" OR \"Series B\") AND \"funding\"",
+        "\"excited to share\" AND \"funded by\" AND (\"Sequoia\" OR \"Andreessen\" OR \"Y Combinator\")"
+      ]
+    },
+    "targetTitles": [
+      "CTO",
+      "Chief Technology Officer",
+      "VP of Engineering",
+      "VP Engineering",
+      "VP, Engineering",
+      "Founder",
+      "Co-Founder",
+      "Chief Executive Officer",
+      "CEO",
+      "Chief Operating Officer",
+      "Head of Engineering",
+      "Head of Talent",
+      "Head of Talent Acquisition",
+      "Head of People",
+      "VP of People",
+      "Recruiter",
+      "Recruiting Lead",
+      "Engineering Manager",
+      "Director of Engineering"
+    ],
+    "targetCountries": [
+      "United States",
+      "United Kingdom",
+      "United Arab Emirates",
+      "Canada",
+      "Australia",
+      "Singapore"
+    ],
+    "targetIndustries": [
+      "Software Development",
+      "Technology",
+      "Financial Services",
+      "Fintech",
+      "Information Technology",
+      "Internet",
+      "SaaS",
+      "E-commerce",
+      "Healthcare Technology",
+      "Edtech"
+    ]
+  },
+  "campaignTypes": {
+    "direct": {
+      "name": "Direct Outreach",
+      "description": "Focus on hiring signals from specific company",
+      "searchFocus": "hiringSignals"
+    },
+    "fundingBased": {
+      "name": "Funding-Trigger Campaign",
+      "description": "Target recently funded startups announcing Series A/B",
+      "searchFocus": "fundingTrigger"
+    },
+    "roleSpecific": {
+      "name": "Role-Specific",
+      "description": "Target specific roles (CTO, VP Eng, Founders)",
+      "searchFocus": "byRole"
+    }
+  },
+  "emailPersonalizationTokens": [
+    "{{companyName}}",
+    "{{prospectName}}",
+    "{{prospectRole}}",
+    "{{prospectCompanyName}}",
+    "{{prospectCompanyIndustry}}",
+    "{{prospectCompanyFunding}}",
+    "{{prospectCompanyTeamSize}}",
+    "{{hiringNeed}}",
+    "{{personalizationInsight}}"
+  ],
+  "defaultFollowUpSchedule": [
+    {
+      "day": 3,
+      "type": "email",
+      "description": "First follow-up - Value add angle"
+    },
+    {
+      "day": 7,
+      "type": "linkedin",
+      "description": "LinkedIn connection request if not connected"
+    },
+    {
+      "day": 14,
+      "type": "email",
+      "description": "Second follow-up - Different angle"
+    },
+    {
+      "day": 21,
+      "type": "linkedin",
+      "description": "LinkedIn message with social proof"
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import inboundRouter from './routes/inbound.js';
 import linkedinRouter from './routes/linkedin.js';
 import companyRouter from './routes/company.js';
 import outboundRouter from './routes/outbound.js';
+import campaignsV2Router from './routes/campaigns-v2.js';
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -22,6 +23,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/campaigns', campaignsRouter);
+app.use('/campaigns-v2', campaignsV2Router);
 app.use('/scrape-leads', scrapeLeadsRouter);
 app.use('/google', googleCalendarRouter);
 app.use('/auth', authRouter);
