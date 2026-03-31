@@ -27,6 +27,7 @@ import {
   SlidersHorizontal,
   Plus,
   Inbox,
+  Linkedin,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -246,6 +247,17 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           >
             <Inbox className="w-8 h-8" />
             <span className={isOpen ? 'inline-flex' : 'hidden'}>Inbound</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-[#0a66c2] dark:text-[#70b5f9] hover:bg-[#0a66c2]/10 dark:hover:bg-[#70b5f9]/10 hover:text-[#0a66c2] dark:hover:text-[#70b5f9] transition-shadow`}
+            onClick={() => {
+              setActiveTab('linkedin');
+              router.push('/linkedin');
+            }}
+          >
+            <Linkedin className="w-8 h-8" />
+            <span className={isOpen ? 'inline-flex font-semibold' : 'hidden'}>LinkedIn</span>
           </Button>
           <div className={`${isOpen ? 'flex' : 'hidden'} items-center gap-2 text-base text-[#AFAFAF] mt-2 pl-2`}>
             <span>campaigns</span>
