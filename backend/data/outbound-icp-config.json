@@ -1,0 +1,120 @@
+{
+  "outbound": {
+    "targetICP": {
+      "companyStage": ["Series A", "Series B"],
+      "geography": ["US", "UAE", "UK"],
+      "hiringActivity": "Currently hiring (active job postings or recent LinkedIn hiring)",
+      "teamSize": {
+        "min": 10,
+        "max": 300
+      },
+      "growthRate": "50%+ YoY preferred",
+      "keywords": [
+        "hiring",
+        "scaling team",
+        "expanding",
+        "build out team",
+        "recruiting",
+        "growing company"
+      ]
+    },
+    "targetRoles": {
+      "highPriority": [
+        "VP Engineering / CTO",
+        "Head of People / VP HR",
+        "Founder",
+        "Co-Founder",
+        "Chief People Officer",
+        "Recruiting Lead"
+      ],
+      "secondary": [
+        "VP Operations",
+        "VP Product",
+        "Director of Engineering",
+        "Head of Operations"
+      ]
+    },
+    "targetIndustries": [
+      "SaaS & B2B Technology",
+      "Fintech & Neo-Banking",
+      "Healthtech & Healthcare IT",
+      "E-commerce & D2C",
+      "AI, Data Science & Engineering",
+      "Digital Media & Marketing",
+      "Martech",
+      "HR Tech"
+    ],
+    "excludeCriteria": {
+      "companies": [
+        "Government agencies",
+        "Non-profits (unless well-funded)",
+        "Recruitment agencies (unless looking to partner)"
+      ],
+      "locations": [
+        "India",
+        "Pakistan",
+        "Bangladesh",
+        "Eastern Europe (lower pay markets)"
+      ],
+      "industries": [
+        "Commodity trading",
+        "Manufacturing (low-tech)",
+        "Construction"
+      ],
+      "hiringStatus": [
+        "Layoffs mentioned",
+        "Hiring freeze",
+        "Pre-revenue / no funding"
+      ]
+    },
+    "scoringWeights": {
+      "stageMatch": 0.25,
+      "geographyMatch": 0.20,
+      "activeHiring": 0.25,
+      "industryMatch": 0.15,
+      "teamSizeMatch": 0.10,
+      "roleFit": 0.05
+    },
+    "minQualificationScore": 65,
+    "minHighPriorityRoleScore": 50,
+    "minSecondaryRoleScore": 70,
+    "outreachStrategy": {
+      "channel": "LinkedIn",
+      "approach": "Personalized connection request with thoughtful message",
+      "firstTouchpoint": "LinkedIn connection + saved message",
+      "followUp": {
+        "emailDay": 3,
+        "linkedinMessage": 7,
+        "secondEmail": 14
+      }
+    },
+    "messagingThemes": [
+      {
+        "theme": "Hiring challenges",
+        "angle": "When startups are scaling, finding top talent is the biggest blocker"
+      },
+      {
+        "theme": "Speed of hiring",
+        "angle": "SutraHR fills positions in 21 days vs. traditional 90+ days"
+      },
+      {
+        "theme": "Cost efficiency",
+        "angle": "No per-hire fees, no long-term contracts - pay once"
+      },
+      {
+        "theme": "India talent pool",
+        "angle": "Access to 10,000+ companies worth of vetted engineers"
+      },
+      {
+        "theme": "Startup expertise",
+        "angle": "We understand startup hiring - quick, lean, quality talent"
+      }
+    ],
+    "campaignConfig": {
+      "dailyOutreach": 10,
+      "weeklyOutreach": 50,
+      "targetResponseRate": "10-15%",
+      "targetConversionRate": "2-3%"
+    }
+  }
+}

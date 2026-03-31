@@ -9,6 +9,7 @@ import authRouter from './routes/auth.js';
 import inboundRouter from './routes/inbound.js';
 import linkedinRouter from './routes/linkedin.js';
 import companyRouter from './routes/company.js';
+import outboundRouter from './routes/outbound.js';
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -27,6 +28,7 @@ app.use('/auth', authRouter);
 app.use('/inbound', inboundRouter);
 app.use('/linkedin', linkedinRouter);
 app.use('/company', companyRouter);
+app.use('/outbound', outboundRouter);
 
 app.listen(port, () => {
   console.log(`Backend API listening on http://localhost:${port}`);
