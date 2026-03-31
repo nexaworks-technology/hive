@@ -12,6 +12,18 @@ const router = express.Router();
 router.post('/create', (req, res) => {
   try {
     const campaignData = req.body;
+    
+    // Map frontend field names to backend field names
+    if (campaignData.companyWebsite && !campaignData.targetCompanyWebsite) {
+      campaignData.targetCompanyWebsite = campaignData.companyWebsite;
+    }
+    
+    // Generate campaign name from targetCompany and campaignType if not provided
+    if (!campaignData.campaignName && campaignData.targetCompany) {
+      const month = new Date().toLocaleString('default', { month: 'short' });
+      const year = new Date().getFullYear();
+      campaignData.campaignName = `${month} ${year} - ${campaignData.targetCompany} ${campaignData.campaignType || 'Campaign'}`;
+    }
 
     if (!campaignData.campaignName || !campaignData.targetCompany) {
       return res.status(400).json({

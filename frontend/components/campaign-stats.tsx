@@ -36,7 +36,7 @@ export default function CampaignStats({ campaignId }: CampaignStatsProps) {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch(`/api/campaigns-v2/${campaignId}/stats`);
+      const res = await fetch(`http://localhost:4000/campaigns-v2/${campaignId}/stats`);
       const data = await res.json();
       setStats(data.stats);
     } catch (error) {

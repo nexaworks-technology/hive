@@ -42,7 +42,7 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
 
   const fetchProspects = async () => {
     try {
-      const res = await fetch(`/api/campaigns-v2/${campaignId}/prospects/list`);
+      const res = await fetch(`http://localhost:4000/campaigns-v2/${campaignId}/prospects/list`);
       const data = await res.json();
       setProspects(data.prospects || []);
     } catch (error) {

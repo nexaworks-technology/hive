@@ -21,7 +21,7 @@ export default function CampaignsPage() {
 
   const handleSelectCampaign = async (campaignId: string) => {
     try {
-      const res = await fetch(`/api/campaigns-v2/${campaignId}`);
+      const res = await fetch(`http://localhost:4000/campaigns-v2/${campaignId}`);
       const data = await res.json();
       setCampaignDetails(data.campaign);
       setSelectedCampaignId(campaignId);

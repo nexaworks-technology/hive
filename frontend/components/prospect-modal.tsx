@@ -47,7 +47,7 @@ export default function ProspectModal({
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/campaigns-v2/${campaignId}/prospects/${prospect.id}/schedule-followup`,
+        `http://localhost:4000/campaigns-v2/${campaignId}/prospects/${prospect.id}/schedule-followup`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

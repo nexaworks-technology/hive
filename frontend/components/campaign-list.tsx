@@ -33,7 +33,7 @@ export default function CampaignList({ onSelectCampaign }: CampaignListProps) {
 
   const fetchCampaigns = async () => {
     try {
-      const res = await fetch('/api/campaigns-v2');
+      const res = await fetch('http://localhost:4000/campaigns-v2');
       const data = await res.json();
       setCampaigns(data.campaigns || []);
     } catch (error) {

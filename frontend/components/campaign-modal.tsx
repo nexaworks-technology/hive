@@ -39,7 +39,7 @@ export default function CampaignModal({ isOpen, onClose }: CampaignModalProps) {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/campaigns-v2/create', {
+      const res = await fetch('http://localhost:4000/campaigns-v2/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

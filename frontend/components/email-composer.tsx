@@ -38,7 +38,7 @@ export default function EmailComposer({
   const fetchProspectData = async () => {
     try {
       const res = await fetch(
-        `/api/campaigns-v2/${campaignId}/prospects/${prospectId}/details`
+        `http://localhost:4000/campaigns-v2/${campaignId}/prospects/${prospectId}/details`
       );
       const data = await res.json();
       setProspectData(data.prospect);
@@ -91,7 +91,7 @@ Pavan`);
     setSending(true);
     try {
       const res = await fetch(
-        `/api/campaigns-v2/${campaignId}/prospects/${prospectId}/send-email`,
+        `http://localhost:4000/campaigns-v2/${campaignId}/prospects/${prospectId}/send-email`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
