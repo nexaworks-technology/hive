@@ -157,7 +157,7 @@ export default function CampaignStats({ campaignId }: CampaignStatsProps) {
             <div className="flex justify-between items-center pb-3 border-b">
               <span className="text-sm text-gray-700">Avg emails per prospect</span>
               <span className="text-lg font-semibold">
-                {stats.avgEmailsPerProspect.toFixed(1)}
+                {(stats.avgEmailsPerProspect || 0).toFixed(1)}
               </span>
             </div>
             <div className="flex justify-between items-center pb-3 border-b">
