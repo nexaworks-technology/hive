@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
 import CampaignModal from './campaign-modal';
 
 interface Campaign {
@@ -26,9 +27,19 @@ export default function CampaignList({ onSelectCampaign }: CampaignListProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchCampaigns();
+    
+    // Poll campaigns every 3 seconds in case new ones are being scraped
+    pollIntervalRef.current = setInterval(() => {
+      fetchCampaigns();
+    }, 3000);
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
   }, []);
 
   const fetchCampaigns = async () => {
@@ -83,8 +94,16 @@ export default function CampaignList({ onSelectCampaign }: CampaignListProps) {
               onClick={() => onSelectCampaign(campaign.id)}
             >
               <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold">{campaign.name}</h3>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold">{campaign.name}</h3>
+                    {campaign.prospectCount === 0 && (
+                      <div className="flex items-center gap-1 text-xs text-blue-600">
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Scraping...</span>
+                      </div>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-600">Target: {campaign.targetCompany}</p>
                 </div>
                 <Badge className={getStatusColor(campaign.status)}>

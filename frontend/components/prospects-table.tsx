@@ -38,6 +38,13 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
 
   useEffect(() => {
     fetchProspects();
+    
+    // Auto-poll every 2 seconds while loading to catch newly scraped prospects
+    const pollInterval = setInterval(() => {
+      fetchProspects();
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
   }, [campaignId]);
 
   const fetchProspects = async () => {
