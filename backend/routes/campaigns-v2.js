@@ -47,37 +47,56 @@ router.post('/create', async (req, res) => {
     (async () => {
       try {
         const query = `${campaignData.targetCompany} company website`;
-        console.log(`[campaigns-v2] Auto-scraping prospects for: ${query}`);
+        console.log(`[campaigns-v2] Starting auto-scrape for: ${query}`);
         
-        const domains = await searchCompanies(query);
+        let domains = [];
+        try {
+          domains = await searchCompanies(query);
+          console.log(`[campaigns-v2] Found ${domains.length} domains for ${campaignData.targetCompany}`);
+        } catch (err) {
+          console.error(`[campaigns-v2] Domain search error:`, err.message);
+          return; // Exit if domain search fails
+        }
+
         const browser = await chromium.launch({ headless: true });
         const scrapedLeads = [];
 
         try {
-          for (const domain of domains.slice(0, 10)) {
-            let hunterLead = null;
+          for (const domain of domains.slice(0, 5)) { // Limit to 5 domains to avoid timeout
             try {
-              hunterLead = await fetchHunterLead(domain);
-            } catch (err) {
-              console.warn(`[campaigns-v2] Hunter error for ${domain}:`, err.message);
-            }
+              console.log(`[campaigns-v2] Scraping domain: ${domain}`);
+              
+              let hunterLeads = [];
+              try {
+                hunterLeads = await fetchHunterLead(domain);
+                console.log(`[campaigns-v2] Found ${hunterLeads.length} contacts in ${domain}`);
+              } catch (err) {
+                console.warn(`[campaigns-v2] Hunter error for ${domain}:`, err.message);
+                continue;
+              }
 
-            let siteTitle = null;
-            try {
-              siteTitle = await fetchMetaFromSite(domain, browser);
-            } catch (err) {
-              console.warn(`[campaigns-v2] Playwright error for ${domain}:`, err.message);
-            }
+              let siteTitle = null;
+              try {
+                siteTitle = await fetchMetaFromSite(domain, browser);
+              } catch (err) {
+                console.warn(`[campaigns-v2] Playwright error for ${domain}:`, err.message);
+              }
 
-            if (hunterLead) {
-              scrapedLeads.push({
-                name: hunterLead.name,
-                email: hunterLead.email,
-                title: hunterLead.position || 'Unknown',
-                company: siteTitle || domain,
-                linkedin: hunterLead.linkedin || `https://www.google.com/search?q=${encodeURIComponent(hunterLead.name + ' ' + domain)}`,
-                industry: ''
-              });
+              // Add all contacts from this domain
+              if (hunterLeads && Array.isArray(hunterLeads) && hunterLeads.length > 0) {
+                hunterLeads.forEach(hunterLead => {
+                  scrapedLeads.push({
+                    name: hunterLead.name,
+                    email: hunterLead.email,
+                    title: hunterLead.position || 'Unknown',
+                    company: siteTitle || domain,
+                    linkedin: hunterLead.linkedin || `https://www.google.com/search?q=${encodeURIComponent(hunterLead.name + ' ' + domain)}`,
+                    industry: ''
+                  });
+                });
+              }
+            } catch (domainErr) {
+              console.error(`[campaigns-v2] Error processing domain ${domain}:`, domainErr.message);
             }
           }
         } finally {
@@ -85,13 +104,13 @@ router.post('/create', async (req, res) => {
         }
 
         // Add scraped leads to campaign
+        console.log(`[campaigns-v2] Total scraped leads: ${scrapedLeads.length}`);
         if (scrapedLeads.length > 0) {
           const addResult = campaignManager.addProspectsFromScrapedLeads(campaign.id, scrapedLeads);
           console.log(`[campaigns-v2] Added ${addResult.totalAdded} prospects to campaign ${campaign.id}`);
         }
       } catch (err) {
-        console.error('[campaigns-v2] Auto-scraping error:', err.message);
-        // Continue - scraping failure shouldn't block campaign creation
+        console.error('[campaigns-v2] Auto-scraping fatal error:', err.message);
       }
     })();
 

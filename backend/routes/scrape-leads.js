@@ -50,7 +50,7 @@ async function fetchHunterLead(domain) {
   const params = new URLSearchParams({
     domain,
     api_key: HUNTER_API_KEY,
-    limit: '1',
+    limit: '50', // Get up to 50 contacts per domain
   });
 
   const res = await fetch(`https://api.hunter.io/v2/domain-search?${params.toString()}`);
@@ -59,16 +59,17 @@ async function fetchHunterLead(domain) {
     throw new Error(`Hunter failed for ${domain}: ${res.status} ${text}`);
   }
   const payload = await res.json();
-  const first = payload?.data?.emails?.[0];
-  if (!first) return null;
+  const emails = payload?.data?.emails || [];
+  if (!emails.length) return [];
 
-  return {
+  // Return all contacts from this domain, not just the first one
+  return emails.map(email => ({
     domain,
-    email: first.value,
-    name: first.first_name && first.last_name ? `${first.first_name} ${first.last_name}` : first.first_name || 'Lead',
-    position: first.position || 'Unknown',
-    linkedin: first.linkedin || '',
-  };
+    email: email.value,
+    name: email.first_name && email.last_name ? `${email.first_name} ${email.last_name}` : email.first_name || 'Lead',
+    position: email.position || 'Unknown',
+    linkedin: email.linkedin || '',
+  }));
 }
 
 async function fetchMetaFromSite(domain, browser) {
@@ -106,9 +107,9 @@ router.post('/', async (req, res) => {
 
   try {
     for (const domain of domains.slice(0, limit)) {
-      let hunterLead = null;
+      let hunterLeads = [];
       try {
-        hunterLead = await fetchHunterLead(domain);
+        hunterLeads = await fetchHunterLead(domain);
       } catch (err) {
         console.warn(`[scrape-leads] hunter error for ${domain}`, err.message);
       }
@@ -120,19 +121,22 @@ router.post('/', async (req, res) => {
         console.warn(`[scrape-leads] playwright meta error for ${domain}`, err.message);
       }
 
-      if (hunterLead) {
-        leads.push({
-          id: `lead-${domain}-${Date.now()}`,
-          name: hunterLead.name,
-          title: hunterLead.position,
-          company: siteTitle || domain,
-          email: hunterLead.email,
-          linkedin: hunterLead.linkedin || `https://www.google.com/search?q=${encodeURIComponent(hunterLead.name + ' ' + domain)}`,
-          emailSent: false,
-          replied: false,
-          followupCount: 0,
-          summary: `Lead from ${domain}`,
-          talkingPoints: [],
+      // Add all contacts from this domain as separate leads
+      if (hunterLeads && Array.isArray(hunterLeads)) {
+        hunterLeads.forEach((hunterLead, idx) => {
+          leads.push({
+            id: `lead-${domain}-${idx}-${Date.now()}`,
+            name: hunterLead.name,
+            title: hunterLead.position,
+            company: siteTitle || domain,
+            email: hunterLead.email,
+            linkedin: hunterLead.linkedin || `https://www.google.com/search?q=${encodeURIComponent(hunterLead.name + ' ' + domain)}`,
+            emailSent: false,
+            replied: false,
+            followupCount: 0,
+            summary: `Lead from ${domain}`,
+            talkingPoints: [],
+          });
         });
       }
     }
