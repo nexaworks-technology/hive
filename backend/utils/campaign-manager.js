@@ -234,7 +234,7 @@ class CampaignManager {
       success: true,
       campaign: {
         ...campaign,
-        prospercts: prospects,
+        prospects: prospects,
         stats: {
           total: campaign.prospectCount,
           pending: prospects.filter(p => p.status === 'pending').length,
@@ -316,6 +316,8 @@ class CampaignManager {
   personalizeEmail(emailTemplate, prospect, campaignDetails = {}) {
     let personalizedEmail = emailTemplate;
 
+    const enrichedData = prospect.enrichedData || {};
+
     const tokens = {
       '{{companyName}}': campaignDetails.targetCompany || 'SutraHR',
       '{{prospectName}}': prospect.name || '',
@@ -324,7 +326,11 @@ class CampaignManager {
       '{{prospectCompanyIndustry}}': prospect.industry || '',
       '{{prospectCompanyLocation}}': prospect.location || '',
       '{{hiringNeed}}': campaignDetails.hiringFocus ? 'tech talent' : 'talent',
-      '{{personalizationInsight}}': prospect.personalizationInfo?.insight || ''
+      '{{personalizationInsight}}': prospect.personalizationInfo?.insight || '',
+      // Enriched tokens
+      '{{prospectHeadline}}': enrichedData.prospectHeadline || '',
+      '{{prospectAchievement}}': enrichedData.prospectAchievement || '',
+      '{{recentJobChange}}': enrichedData.recentJobChange || ''
     };
 
     Object.entries(tokens).forEach(([token, value]) => {

@@ -19,6 +19,7 @@ export default function HistoryView() {
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
   const [remoteCampaigns, setRemoteCampaigns] = useState<any[]>([]);
   const [isLoadingRemote, setIsLoadingRemote] = useState(false);
+  const [autoSentIds, setAutoSentIds] = useState<Set<string>>(new Set());
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
   const { session } = useSessionContext();
 
@@ -28,39 +29,53 @@ export default function HistoryView() {
   }, []);
 
   useEffect(() => {
-    const fetchCampaigns = async () => {
+    const fetchCampaignData = async () => {
+      if (!workflowState?.currentCampaignId) return;
+      
       setIsLoadingRemote(true);
       try {
-        const res = await fetch(`${apiBaseUrl}/campaigns`, {
+        const res = await fetch(`${apiBaseUrl}/campaigns-v2/${workflowState.currentCampaignId}`, {
           headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
         });
-        if (!res.ok) throw new Error('Failed to fetch campaigns');
-        const payload = await res.json().catch(() => ({}));
-        setRemoteCampaigns(payload.campaigns || []);
+        if (!res.ok) {
+          console.error('Failed to fetch campaign details');
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        // Handle the response format: { success: true, campaign: {...} }
+        const campaign = data.campaign || data;
+        setRemoteCampaigns(campaign ? [campaign] : []);
       } catch (err) {
-        console.error('Failed to load campaigns', err);
+        console.error('Failed to load campaign details', err);
       } finally {
         setIsLoadingRemote(false);
       }
     };
 
-    if (session) {
-      fetchCampaigns();
+    if (session && workflowState?.currentCampaignId) {
+      fetchCampaignData();
     }
-  }, [apiBaseUrl, session]);
+  }, [apiBaseUrl, session, workflowState?.currentCampaignId]);
 
   if (!workflowState) return null;
 
-  const campaignSource = (remoteCampaigns.length ? remoteCampaigns : workflowState.campaignHistory) || [];
-  const activeCampaign = campaignSource.find((c) => c.id === workflowState.currentCampaignId) || campaignSource[0];
-  const campaignTitle = activeCampaign?.title || activeCampaign?.targetAudience || 'History';
+  // Only use remote campaigns fetched from backend, don't fallback to old localStorage data
+  const activeCampaign = remoteCampaigns.length > 0 ? remoteCampaigns[0] : null;
+  const campaignTitle = activeCampaign?.domain || activeCampaign?.name || 'Campaign';
 
-  // Combine current leads with historical leads (from backend payload when available)
+  // Only get leads from the actual fetched campaign, not from localStorage
   const selectedCampaignLeads = activeCampaign
-    ? ((activeCampaign.payload?.leads as Lead[]) || (activeCampaign.leads as Lead[]) || [])
+    ? (
+        (activeCampaign.payload?.leads as Lead[]) || 
+        (activeCampaign.leads as Lead[]) || 
+        (activeCampaign.prospercts as Lead[]) ||  // Handle campaignManager typo
+        (activeCampaign.prospects as Lead[]) ||
+        []
+      )
     : [];
 
-  const includeCurrent = workflowState.currentCampaignId && activeCampaign?.id === workflowState.currentCampaignId;
+  // Only include current state leads if we're in the same campaign AND actively building it
+  const includeCurrent = workflowState.currentCampaignId && activeCampaign?.id === workflowState.currentCampaignId && workflowState.currentStage !== 'history';
   const combinedLeads = includeCurrent ? [...workflowState.leads, ...selectedCampaignLeads] : selectedCampaignLeads;
 
   const sentEmailsByEmail = new Set((workflowState.sentEmails || []).map((e) => (e.email || '').toLowerCase()).filter(Boolean));
@@ -117,7 +132,7 @@ export default function HistoryView() {
     <div className="space-y-6">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground">{campaignTitle}</h1>
-        <p className="text-sm text-muted-foreground mt-2">Follow-ups, replies, and meetings for this campaign</p>
+        <p className="text-sm text-muted-foreground mt-2">{isLoadingRemote ? 'Loading campaign data...' : 'Follow-ups, replies, and meetings for this campaign'}</p>
       </div>
 
       <Card className="p-6 border-border bg-card">

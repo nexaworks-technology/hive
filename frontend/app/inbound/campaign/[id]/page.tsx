@@ -117,9 +117,52 @@ function StatCard({ label, value, icon, color, sub }: { label: string; value: nu
 
 // ─── Reply Card ───────────────────────────────────────────────────────────────
 
-function ReplyCard({ lead, onMarkBooked }: { lead: LeadRecord; onMarkBooked: () => void }) {
+function ReplyCard({ lead, onMarkBooked, campaignId, onAutoReplySent }: { lead: LeadRecord; onMarkBooked: () => void; campaignId: string; onAutoReplySent: () => void }) {
   const intent = lead.replyIntent || 'question';
   const meta = INTENT_META[intent] || INTENT_META['question'];
+  const { session } = useSessionContext();
+  const [sendingAutoReply, setSendingAutoReply] = useState(false);
+
+  const handleSendAutoReply = async () => {
+    if (!lead.replyText) {
+      alert('No reply text to respond to');
+      return;
+    }
+
+    setSendingAutoReply(true);
+    try {
+      const res = await fetch(
+        `http://localhost:4000/campaigns-v2/${campaignId}/prospects/${lead.id}/send-auto-reply`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`
+          },
+          body: JSON.stringify({
+            replyText: lead.replyText,
+            replyIntent: intent
+          })
+        }
+      );
+
+      if (res.ok) {
+        const result = await res.json();
+        console.log('✅ Auto-reply sent:', result.autoReply.subject);
+        alert('✅ Auto-reply sent successfully!');
+        onAutoReplySent();
+      } else {
+        const error = await res.json();
+        console.error('❌ Failed to send auto-reply:', error);
+        alert('Failed to send auto-reply: ' + (error.details || error.error));
+      }
+    } catch (err) {
+      console.error('Error sending auto-reply:', err);
+      alert('Error: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setSendingAutoReply(false);
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -165,15 +208,27 @@ function ReplyCard({ lead, onMarkBooked }: { lead: LeadRecord; onMarkBooked: () 
 
       {/* AI auto-reply */}
       <div className="px-5 py-4">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
-          <BotMessageSquare className="w-3 h-3" /> AI Auto-Reply
-          {lead.autoReplySent
-            ? <span className="text-green-500 font-normal normal-case flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Sent {formatDate(lead.autoReplySentAt)}</span>
-            : lead.autoReplyError
-            ? <span className="text-destructive font-normal normal-case flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Failed to send</span>
-            : <span className="text-muted-foreground font-normal normal-case">(pending)</span>
-          }
-        </p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <BotMessageSquare className="w-3 h-3" /> AI Auto-Reply
+            {lead.autoReplySent
+              ? <span className="text-green-500 font-normal normal-case flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Sent {formatDate(lead.autoReplySentAt)}</span>
+              : lead.autoReplyError
+              ? <span className="text-destructive font-normal normal-case flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Failed</span>
+              : <span className="text-muted-foreground font-normal normal-case">(not sent)</span>
+            }
+          </p>
+          {!lead.autoReplySent && lead.replyText && (
+            <button
+              onClick={handleSendAutoReply}
+              disabled={sendingAutoReply}
+              className="text-xs px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-all font-medium disabled:opacity-50"
+            >
+              {sendingAutoReply ? '⏳ Sending...' : '🤖 Send Auto-Reply'}
+            </button>
+          )}
+        </div>
+        
         {lead.autoReplySubject && <p className="text-xs text-muted-foreground mb-1"><span className="font-medium">Subject:</span> {lead.autoReplySubject}</p>}
         {lead.autoReplyBody && <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/80">{lead.autoReplyBody}</p>}
         {lead.autoReplyError && <p className="text-xs text-destructive mt-1">Error: {lead.autoReplyError}</p>}
@@ -272,6 +327,44 @@ export default function InboundCampaignPage() {
       if (!res.ok) throw new Error(result.error || 'Check failed');
       setCheckReplyResult({ newReplies: result.newReplies || 0 });
       await fetchData();
+      
+      // Auto-send replies for all leads with new replies
+      if ((result.newReplies || 0) > 0) {
+        const updatedData = await (await fetch(`${API_BASE}/inbound/${id}/leads`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })).json();
+        
+        const leadsWithNewReplies = updatedData.leads.filter(
+          (l: LeadRecord) => l.replied && !l.autoReplySent && l.replyText && l.replyIntent
+        );
+        
+        for (const lead of leadsWithNewReplies) {
+          try {
+            console.log(`🤖 Auto-replying to ${lead.name}...`);
+            await fetch(
+              `${API_BASE}/campaigns-v2/${id}/prospects/${lead.id}/send-auto-reply`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({
+                  replyText: lead.replyText,
+                  replyIntent: lead.replyIntent
+                })
+              }
+            );
+            console.log(`✅ Auto-reply sent to ${lead.name}`);
+          } catch (err) {
+            console.error(`❌ Failed to auto-reply to ${lead.name}:`, err);
+          }
+        }
+        
+        // Refresh data to show auto-reply status
+        await fetchData();
+      }
+      
       if ((result.newReplies || 0) > 0) setActiveTab('replies');
     } catch (e: any) {
       setCheckReplyError(e.message || 'Failed to check replies');
@@ -365,34 +458,8 @@ export default function InboundCampaignPage() {
             <Button variant="outline" size="sm" onClick={fetchData} className="gap-2">
               <RefreshCw className="w-3.5 h-3.5" />Refresh
             </Button>
-            <Button
-              size="sm"
-              onClick={handleCheckReplies}
-              disabled={isCheckingReplies}
-              className="gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 shadow-none"
-            >
-              {isCheckingReplies
-                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Checking inbox...</>
-                : <><Inbox className="w-3.5 h-3.5" />Check for Replies</>
-              }
-            </Button>
           </div>
         </div>
-
-        {/* Reply check results */}
-        {checkReplyResult && (
-          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm animate-in fade-in border ${checkReplyResult.newReplies > 0 ? 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400' : 'bg-muted border-border text-muted-foreground'}`}>
-            {checkReplyResult.newReplies > 0
-              ? <><CheckCircle2 className="w-4 h-4 flex-shrink-0" /><strong>{checkReplyResult.newReplies} new {checkReplyResult.newReplies === 1 ? 'reply' : 'replies'} found</strong> — AI has auto-responded to each one.</>
-              : <><Inbox className="w-4 h-4 flex-shrink-0" />No new replies in the inbox right now.</>
-            }
-          </div>
-        )}
-        {checkReplyError && (
-          <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm animate-in fade-in bg-destructive/5 border border-destructive/20 text-destructive">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />{checkReplyError}
-          </div>
-        )}
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -537,7 +604,7 @@ export default function InboundCampaignPage() {
               <div className="rounded-2xl border border-dashed border-border py-20 text-center">
                 <Inbox className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-40" />
                 <p className="text-muted-foreground font-medium">No replies yet</p>
-                <p className="text-sm text-muted-foreground mt-1">Click <span className="font-medium text-foreground">Check for Replies</span> above to poll your inbox.</p>
+                <p className="text-sm text-muted-foreground mt-1">Replies are checked automatically every minute and AI auto-replies are sent instantly.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -546,6 +613,8 @@ export default function InboundCampaignPage() {
                     key={lead.id}
                     lead={lead}
                     onMarkBooked={() => handleMarkLead(lead.id, 'meetingBooked', true)}
+                    campaignId={id}
+                    onAutoReplySent={fetchData}
                   />
                 ))}
               </div>

@@ -2,8 +2,18 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+import { google } from 'googleapis';
 import leadQualifier from '../utils/lead-qualifier.js';
 import companyInsights from '../utils/company-insights.js';
+import {
+  generateTier1Email_Day1,
+  generateTier2Email_Day1,
+  generateTier3Email_Day1,
+  generateFollowUpEmail
+} from '../utils/html-email-templates.js';
+import { getUserProfile } from '../utils/user-profile.js';
+import { supabase } from '../supabase-client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -182,6 +192,272 @@ router.post('/prepare-outreach', (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+/**
+ * POST /outbound/send-prospecting-email
+ * Generate and send HTML prospecting email based on prospect tier
+ * Body: { prospectName, prospectEmail, prospectCompany, prospectTitle, tier, dayNumber, userId }
+ */
+/**
+ * POST /outbound/test-html-email
+ * TEST EMAIL - Send a sample HTML email with Tier 1 template
+ */
+router.post('/test-html-email', async (req, res) => {
+  try {
+    const { prospectName = 'John', prospectEmail, prospectCompany = 'Acme Corp', userId } = req.body;
+
+    if (!prospectEmail) {
+      return res.status(400).json({ error: 'prospectEmail is required' });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required - please log in and connect your Google account' });
+    }
+
+    // Generate Tier 1 email
+    const htmlEmail = generateTier1Email_Day1(prospectName, prospectCompany);
+    const subject = `🧪 TEST: Speed + vetting quality for ${prospectCompany}?`;
+
+    console.log(`[outbound-test] 📧 Sending TEST HTML email to ${prospectEmail}`);
+
+    let userProfile = null;
+    try {
+      userProfile = getUserProfile();
+    } catch (err) {
+      console.warn('[outbound-test] Could not load user profile');
+    }
+
+    const senderName = userProfile?.name || 'SutraHR Test';
+
+    try {
+      const sendResult = await sendHTMLEmailViaGmail({
+        to: prospectEmail,
+        subject,
+        htmlBody: htmlEmail,
+        fromName: senderName,
+        userId
+      });
+
+      return res.json({
+        success: true,
+        message: 'TEST HTML email sent successfully!',
+        sendResult
+      });
+    } catch (err) {
+      console.error('[outbound-test] Gmail send error:', err.message);
+      return res.status(500).json({
+        success: false,
+        error: `Failed to send test email: ${err.message}`,
+        hint: 'Make sure your Google account is connected and has Gmail permissions'
+      });
+    }
+  } catch (error) {
+    console.error('[outbound-test] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /outbound/send-prospecting-email
+ * Send a prospecting email with HTML template
+ */
+router.post('/send-prospecting-email', async (req, res) => {
+  try {
+    const { prospectName, prospectEmail, prospectCompany, prospectTitle, tier = 'tier1', dayNumber = 1, userId } = req.body;
+
+    if (!prospectEmail || !prospectCompany || !prospectName) {
+      return res.status(400).json({
+        error: 'Missing required fields: prospectName, prospectEmail, prospectCompany'
+      });
+    }
+
+    // Get user profile for sender info
+    let userProfile = null;
+    try {
+      userProfile = getUserProfile();
+    } catch (err) {
+      console.warn('[outbound] Could not load user profile');
+    }
+
+    const senderName = userProfile?.name || 'SutraHR Team';
+    const senderEmail = userProfile?.email || 'sales@sutrahr.com';
+
+    // Generate HTML email based on tier and day
+    let htmlEmail = null;
+    let subject = '';
+
+    const tierLower = String(tier).toLowerCase();
+
+    if (dayNumber === 1) {
+      // Day 1: Initial outreach based on tier
+      if (tierLower.includes('tier1') || tierLower === '1') {
+        htmlEmail = generateTier1Email_Day1(prospectName, prospectCompany);
+        subject = `Speed + vetting quality for ${prospectCompany}?`;
+      } else if (tierLower.includes('tier2') || tierLower === '2') {
+        htmlEmail = generateTier2Email_Day1(prospectName, prospectCompany);
+        subject = `60% savings + zero risk for ${prospectCompany}`;
+      } else {
+        // Tier 3 (TA/Recruiting)
+        htmlEmail = generateTier3Email_Day1(prospectName, prospectCompany);
+        subject = `Team extension for ${prospectCompany}?`;
+      }
+    } else {
+      // Follow-up emails (day 3, 7, 14, etc.)
+      htmlEmail = generateFollowUpEmail(prospectName, prospectCompany, dayNumber);
+      subject = `Quick follow-up on our previous message`;
+    }
+
+    if (!htmlEmail) {
+      return res.status(400).json({
+        error: 'Could not generate email template for tier: ' + tier
+      });
+    }
+
+    console.log(`[outbound] 📧 Sending HTML email to ${prospectName} <${prospectEmail}>`);
+    console.log(`[outbound] Subject: ${subject}`);
+
+    // Try to send via Gmail API if userId provided
+    let sendResult = { success: false, message: 'Email not sent' };
+
+    if (userId) {
+      try {
+        sendResult = await sendHTMLEmailViaGmail({
+          to: prospectEmail,
+          subject,
+          htmlBody: htmlEmail,
+          fromName: senderName,
+          userId
+        });
+      } catch (err) {
+        console.error('[outbound] Gmail send error:', err.message);
+        sendResult = {
+          success: false,
+          message: `Failed to send via Gmail: ${err.message}`,
+          error: err.message
+        };
+      }
+    } else {
+      // No userId provided - just return the email content for manual testing
+      sendResult = {
+        success: true,
+        message: 'Email generated (not sent - no userId provided)',
+        requiresAuth: true
+      };
+    }
+
+    res.json({
+      success: sendResult.success,
+      email: {
+        to: prospectEmail,
+        from: senderName,
+        subject: subject,
+        htmlBody: htmlEmail,
+        prospectName: prospectName,
+        prospectCompany: prospectCompany,
+        prospectTitle: prospectTitle,
+        tier: tier,
+        dayNumber: dayNumber
+      },
+      sendResult: sendResult
+    });
+  } catch (error) {
+    console.error('[outbound] Error in send-prospecting-email:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Helper function: Send HTML email via Gmail API
+ */
+async function sendHTMLEmailViaGmail({ to, subject, htmlBody, fromName, userId }) {
+  try {
+    // Get stored Gmail tokens for user
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('google_tokens')
+      .select('access_token, refresh_token, scope')
+      .eq('user_id', userId)
+      .single();
+
+    if (tokenError || !tokenData) {
+      throw new Error('Gmail integration not configured. Connect your Google account first.');
+    }
+
+    // Verify Gmail scope
+    if (!tokenData.scope || !tokenData.scope.includes('gmail.send')) {
+      throw new Error('Gmail send permission not granted. Reconnect your Google account.');
+    }
+
+    // Create OAuth client with stored token
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URL
+    );
+
+    oauth2Client.setCredentials({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token
+    });
+
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Build MIME message with proper HTML and text parts
+    const boundary = `----=_Part_${crypto.randomBytes(16).toString('hex')}`;
+    
+    // Create plain text fallback (strip HTML tags)
+    const textBody = htmlBody
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .trim();
+
+    const mimeMessage = [
+      `To: ${to}`,
+      `From: "${fromName}" <me>`,
+      `Subject: =?utf-8?B?${Buffer.from(subject).toString('base64')}?=`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 7bit',
+      '',
+      textBody,
+      `--${boundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: 7bit',
+      '',
+      htmlBody,
+      `--${boundary}--`
+    ].join('\r\n');
+
+    // Encode message for Gmail API
+    const encodedMessage = Buffer.from(mimeMessage)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    // Send via Gmail API
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw: encodedMessage }
+    });
+
+    console.log(`[outbound] ✅ Email sent successfully to ${to}`);
+
+    return {
+      success: true,
+      message: `Email sent successfully to ${to}`,
+      sentTo: to,
+      subject: subject
+    };
+  } catch (error) {
+    console.error('[outbound] Error sending via Gmail:', error.message);
+    throw error;
+  }
+}
 
 /**
  * POST /outbound/filter-qualified

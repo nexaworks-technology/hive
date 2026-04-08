@@ -77,44 +77,139 @@
     },
     "minQualificationScore": 65,
     "minHighPriorityRoleScore": 50,
-    "minSecondaryRoleScore": 70,
-    "outreachStrategy": {
-      "channel": "LinkedIn",
-      "approach": "Personalized connection request with thoughtful message",
-      "firstTouchpoint": "LinkedIn connection + saved message",
-      "followUp": {
-        "emailDay": 3,
-        "linkedinMessage": 7,
-        "secondEmail": 14
+    "minSecondaryRoleScore": 70
+  },
+  "sutrahr_playbook_v1": {
+    "description": "SutraHR Sales Playbook v1 - Indian Growth-Stage Startup ICP",
+    "targetICP": {
+      "companyStage": ["Seed", "Series A", "Series B"],
+      "geography": {
+        "primary": ["Mumbai", "Bangalore", "Delhi NCR", "Hyderabad", "Pune"],
+        "country": ["India"]
+      },
+      "hiringActivity": "8+ open roles (LinkedIn/Naukri), repeated postings, posted recruiter/TA role",
+      "teamSize": {
+        "min": 50,
+        "max": 300,
+        "description": "Growth-stage teams actively hiring"
+      },
+      "growthRate": "25%+ headcount growth YoY",
+      "taTeamSize": {
+        "max": 2,
+        "description": "≤2 recruiters in-house (bottleneck signal)"
+      },
+      "painSignals": [
+        "8+ jobs on LinkedIn/Naukri (multiple roles)",
+        "Repeated postings for same role (3+ times = hiring difficulty)",
+        "Posted 'Recruiter/TA' or 'Head of Talent' role (internal team scaling)",
+        "Founder LinkedIn posts about hiring challenges or team scaling",
+        "25%+ headcount growth (hiring velocity)"
+      ]
+    },
+    "targetRoles": {
+      "decisionMakers": [
+        "Founder",
+        "CEO",
+        "Co-Founder",
+        "CTO / VP Engineering",
+        "Head of People / VP HR",
+        "Chief People Officer"
+      ],
+      "criteria": [
+        "Active on LinkedIn (posts, comments, engagement)",
+        "Recently shared company updates or team news"
+      ]
+    },
+    "targetIndustries": [
+      "Consumer Internet",
+      "Fintech",
+      "SaaS",
+      "D2C",
+      "Healthtech",
+      "Edtech",
+      "Logistics",
+      "HR Tech",
+      "Real Estate Tech",
+      "Gaming",
+      "E-commerce",
+      "Media/OTT"
+    ],
+    "researchSources": {
+      "funding": ["Crunchbase", "Inc42", "YourStory"],
+      "jobs": ["LinkedIn Jobs", "Naukri", "Company careers page"],
+      "headcount": ["LinkedIn company page", "Crunchbase"],
+      "taTeamSize": ["LinkedIn company page search for 'Recruiter' title count"]
+    },
+    "scoringWeights": {
+      "stageMatch": 0.20,
+      "geographyMatch": 0.10,
+      "activeHiring": 0.30,
+      "industryMatch": 0.15,
+      "teamSizeMatch": 0.10,
+      "taTeamSize": 0.10,
+      "decisionMakerActive": 0.05
+    },
+    "minQualificationScore": 60,
+    "qualificationTiers": {
+      "highly_qualified": {
+        "scoreMin": 75,
+        "criteria": "Recent funding + 8+ roles + <2 TA team + founder active",
+        "action": "Priority outreach"
+      },
+      "qualified": {
+        "scoreMin": 60,
+        "criteria": "Series A/B + 5-8 roles + growth signals",
+        "action": "Include in campaign"
+      },
+      "not_qualified": {
+        "scoreMax": 59,
+        "criteria": "Pre-seed, <4 roles, or no TA gaps",
+        "action": "Skip or add to nurture"
       }
     },
-    "messagingThemes": [
-      {
-        "theme": "Hiring challenges",
-        "angle": "When startups are scaling, finding top talent is the biggest blocker"
-      },
-      {
-        "theme": "Speed of hiring",
-        "angle": "SutraHR fills positions in 21 days vs. traditional 90+ days"
-      },
-      {
-        "theme": "Cost efficiency",
-        "angle": "No per-hire fees, no long-term contracts - pay once"
-      },
-      {
-        "theme": "India talent pool",
-        "angle": "Access to 10,000+ companies worth of vetted engineers"
-      },
-      {
-        "theme": "Startup expertise",
-        "angle": "We understand startup hiring - quick, lean, quality talent"
+    "outreachStrategy": {
+      "channel": "Email + LinkedIn (optional)",
+      "approach": "Multi-touch 7-step cadence over 15 days",
+      "firstTouchpoint": "Personalized email (Day 1, Tue-Thu 9am)",
+      "sequence": {
+        "step1": { "day": 1, "type": "email", "variant": "initial_hook" },
+        "step2": { "day": 2, "type": "linkedin", "variant": "connection", "optional": true },
+        "step3": { "day": 4, "type": "email", "variant": "problem_aware" },
+        "step4": { "day": 6, "type": "call", "variant": "voicemail" },
+        "step5": { "day": 10, "type": "email", "variant": "social_proof" },
+        "step6": { "day": 12, "type": "linkedin", "variant": "final", "optional": true },
+        "step7": { "day": 15, "type": "email", "variant": "final_attempt" }
       }
-    ],
-    "campaignConfig": {
-      "dailyOutreach": 10,
-      "weeklyOutreach": 50,
-      "targetResponseRate": "10-15%",
-      "targetConversionRate": "2-3%"
+    },
+    "successMetrics": {
+      "emailOpenRate": "40%+ target",
+      "responseRate": "5-10% (1 in 10-20 contacts)",
+      "meetingBookRate": "30% of responses = 1.5-3% of contacts",
+      "dealClosureRate": "15-25% of meetings",
+      "avgDaysToMeeting": "8-12 days from first sequence touch"
+    },
+    "excludeCriteria": {
+      "companies": [
+        "Government owned or regulated banking",
+        "Non-profits",
+        "Recruitment/staffing agencies"
+      ],
+      "fundingStatus": [
+        "Pre-seed with &lt;₹1Cr funding",
+        "Recent layoffs announced",
+        "Active hiring freeze"
+      ],
+      "taSignals": [
+        "≥3 recruiters already on team",
+        "Recently hired Head of People",
+        "Using external recruiting firm"
+      ]
+    },
+    "messagingThemes": {
+      "pain_statement": "Eight open roles with only one person managing hiring feels chaotic for founders scaling fast.",
+      "value_prop": "Dedicated full-time recruiter, flat fee (no per-hire costs), guaranteed fills in 3 weeks.",
+      "clientProof": "Dream11, PharmEasy, Practo, Pepperfry – all series A/B Indian startups.",
+      "coreAsk": "Could we chat 15 minutes to see if this helps {{companyName}} keep the founder focused on building?"
     }
   }
 }

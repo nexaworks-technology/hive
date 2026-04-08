@@ -121,6 +121,7 @@ export default function CampaignsPage() {
                       </div>
                       <p className="text-gray-600">Target: {campaignDetails?.targetCompany}</p>
                     </div>
+
                   </div>
 
                   {/* Overview Content */}

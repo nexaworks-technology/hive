@@ -13,15 +13,18 @@ interface Prospect {
   email: string;
   role: string;
   company: string;
-  linkedIn: string;
-  mailSent: boolean;
-  replied: boolean;
-  followUpCount: number;
+  linkedinProfile: string;
+  mailSent: string; // "Yes" or "No" from backend
+  replied: string; // "Yes" or "No" from backend
+  followUps: number;
   personalizationInfo: {
-    recentActivity: string;
-    hiringMessage: string;
-    insight: string;
+    source?: string;
+    scrapedAt?: string;
+    industry?: string;
   };
+  status: string;
+  emailsSent: number;
+  replyCount: number;
 }
 
 interface ProspectsTableProps {
@@ -47,11 +50,43 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
     return () => clearInterval(pollInterval);
   }, [campaignId]);
 
+  // Auto-check for replies every 60 seconds
+  useEffect(() => {
+    const autoCheckReplies = async () => {
+      try {
+        console.log(`[prospects-table] Checking for replies in campaign ${campaignId}...`);
+        const res = await fetch(`http://localhost:4000/campaigns-v2/${campaignId}/check-replies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        
+        if (res.ok) {
+          const result = await res.json();
+          if (result.repliesProcessed > 0) {
+            console.log(`✅ Found ${result.repliesProcessed} replies, auto-responses sent!`);
+            await fetchProspects();
+          }
+        }
+      } catch (e) {
+        console.error('[prospects-table] Auto-check error:', e);
+      }
+    };
+
+    const replyCheckInterval = setInterval(() => {
+      autoCheckReplies();
+    }, 60000); // Check every 60 seconds
+
+    // Initial check immediately
+    autoCheckReplies();
+
+    return () => clearInterval(replyCheckInterval);
+  }, [campaignId]);
+
   const fetchProspects = async () => {
     try {
       const res = await fetch(`http://localhost:4000/campaigns-v2/${campaignId}/prospects/list`);
       const data = await res.json();
-      setProspects(data.prospects || []);
+      setProspects(data.prospectsList || []);
     } catch (error) {
       console.error('Failed to fetch prospects:', error);
     } finally {
@@ -62,16 +97,16 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
   const getSortedProspects = () => {
     const sorted = [...prospects];
     if (sortBy === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
-    if (sortBy === 'status') sorted.sort((a, b) => (a.mailSent === b.mailSent ? 0 : a.mailSent ? 1 : -1));
-    if (sortBy === 'replied') sorted.sort((a, b) => (a.replied === b.replied ? 0 : a.replied ? -1 : 1));
+    if (sortBy === 'status') sorted.sort((a, b) => (a.mailSent === b.mailSent ? 0 : a.mailSent === 'Yes' ? 1 : -1));
+    if (sortBy === 'replied') sorted.sort((a, b) => (a.replied === b.replied ? 0 : a.replied === 'Yes' ? -1 : 1));
     return sorted;
   };
 
   if (loading) return <p className="text-center text-gray-500">Loading prospects...</p>;
 
   const sorted = getSortedProspects();
-  const sentCount = prospects.filter((p) => p.mailSent).length;
-  const repliedCount = prospects.filter((p) => p.replied).length;
+  const sentCount = prospects.filter((p) => p.mailSent === 'Yes').length;
+  const repliedCount = prospects.filter((p) => p.replied === 'Yes').length;
 
   return (
     <div className="space-y-4">
@@ -114,20 +149,20 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
                 <td className="px-4 py-3 text-sm">{prospect.role}</td>
                 <td className="px-4 py-3 text-sm">{prospect.company}</td>
                 <td className="px-4 py-3 text-center">
-                  {prospect.mailSent ? (
+                  {prospect.mailSent === 'Yes' ? (
                     <Badge className="bg-green-200 text-green-800">Yes</Badge>
                   ) : (
                     <Badge className="bg-gray-200 text-gray-800">No</Badge>
                   )}
                 </td>
                 <td className="px-4 py-3 text-center">
-                  {prospect.replied ? (
+                  {prospect.replied === 'Yes' ? (
                     <Badge className="bg-blue-200 text-blue-800">Yes</Badge>
                   ) : (
                     <Badge className="bg-gray-200 text-gray-800">No</Badge>
                   )}
                 </td>
-                <td className="px-4 py-3 text-center">{prospect.followUpCount}</td>
+                <td className="px-4 py-3 text-center">{prospect.followUps}</td>
                 <td className="px-4 py-3 text-center space-x-2">
                   <Button
                     size="sm"
@@ -139,12 +174,13 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
                   >
                     View
                   </Button>
-                  {!prospect.mailSent && (
+                  {prospect.mailSent !== 'Yes' && (
                     <Button
                       size="sm"
+                      variant="default"
                       onClick={() => setShowEmailComposer(prospect.id)}
                     >
-                      Send
+                      Send Email
                     </Button>
                   )}
                 </td>

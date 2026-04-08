@@ -476,12 +476,6 @@ export default function StageFour() {
                   <Copy className="w-4 h-4" />
                   {copiedId === selectedLead.id ? 'Copied!' : 'Copy draft'}
                 </Button>
-                <Button
-                  onClick={() => selectedLead && handleSend(selectedLead)}
-                  disabled={sendingId === selectedLead.id || selectedLead.emailSent}
-                >
-                  {sendingId === selectedLead.id ? 'Sending...' : selectedLead.emailSent ? 'Sent' : 'Send'}
-                </Button>
               </div>
             </div>
           </DialogContent>

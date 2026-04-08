@@ -41,55 +41,91 @@ export default function StageOne() {
       duration: 0,
     });
 
-    // Create a campaign record as soon as the user starts the flow so it appears in history/sidebar.
+    // Create a campaign using the new campaigns-v2 endpoint
     try {
-      const res = await fetch(`${apiBaseUrl}/campaigns`, {
+      const res = await fetch(`${apiBaseUrl}/campaigns-v2/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
         body: JSON.stringify({
-          title: prompt,
-          stage: 'stage-1',
-          status: 'running',
-          payload: {
-            targetAudience: prompt,
-            additionalContext: details,
-          },
+          campaignName: prompt,
+          targetCompany: prompt.split(' ')[0] || 'Company',
+          targetCompanyWebsite: '',
+          campaignType: 'direct',
+          description: details,
         }),
       });
 
       const campaignPayload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const message = campaignPayload?.error || campaignPayload?.details || 'Could not log campaign start';
+        const message = campaignPayload?.error || campaignPayload?.details || 'Could not create campaign';
         throw new Error(message);
       }
 
-      const existingHistory = workflowManager.getState().campaignHistory || [];
+      const campaign = campaignPayload.campaign || campaignPayload;
+      
       workflowManager.setState({
-        currentCampaignId: campaignPayload.id,
+        currentCampaignId: campaign.id,
         campaignHistory: [
           {
-            id: campaignPayload.id,
+            id: campaign.id,
             targetAudience: prompt,
             additionalContext: details,
             icpData: undefined,
             leads: [],
-            createdAt: campaignPayload.created_at || new Date().toISOString(),
+            createdAt: campaign.createdAt || new Date().toISOString(),
             leadsScraped: 0,
             emailsSent: 0,
             repliesReceived: 0,
             meetingsScheduled: 0,
           },
-          ...existingHistory,
         ],
       });
+
+      // Auto-send emails once leads are scraped (poll every 2 seconds for 30 seconds)
+      console.log(`[stage-1] 📧 Starting to monitor for scraped leads...`);
+      let pollCount = 0;
+      const pollLeads = setInterval(async () => {
+        pollCount++;
+        const campaignRes = await fetch(`${apiBaseUrl}/campaigns-v2/${campaign.id}`, {
+          headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+        });
+        const campaignData = await campaignRes.json().catch(() => ({}));
+        const scraped = campaignData.campaign?.prospects || campaignData.prospects || [];
+        
+        if (scraped.length > 0) {
+          clearInterval(pollLeads);
+          console.log(`[stage-1] ✅ Found ${scraped.length} leads, auto-sending emails...`);
+          
+          for (const lead of scraped) {
+            try {
+              await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  to: lead.email,
+                  subject: `Quick idea for ${lead.company}`,
+                  body: `Hi ${lead.name},\n\nThought of you regarding ${lead.company}. Would love to connect!\n\nBest`,
+                  fromName: 'SutraHR'
+                })
+              });
+              console.log(`[stage-1] ✅ Email sent to ${lead.email}`);
+            } catch (err) {
+              console.error(`[stage-1] ❌ Failed to send to ${lead.email}`);
+            }
+          }
+        } else if (pollCount > 15) {
+          clearInterval(pollLeads);
+          console.log(`[stage-1] ⏰ Stopped polling - no leads found after 30 seconds`);
+        }
+      }, 2000);
     } catch (err) {
-      console.error('Failed to create campaign record', err);
+      console.error('Failed to create campaign', err);
       toastManager.notify({
-        title: 'Campaign log failed',
-        message: err instanceof Error ? err.message : 'Could not log campaign start',
+        title: 'Campaign creation failed',
+        message: err instanceof Error ? err.message : 'Could not create campaign',
         type: 'error',
       });
     }

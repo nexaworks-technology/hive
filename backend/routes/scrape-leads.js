@@ -50,7 +50,7 @@ async function fetchHunterLead(domain) {
   const params = new URLSearchParams({
     domain,
     api_key: HUNTER_API_KEY,
-    limit: '50', // Get up to 50 contacts per domain
+    limit: '10', // API plan limit is 10 max per domain
   });
 
   const res = await fetch(`https://api.hunter.io/v2/domain-search?${params.toString()}`);

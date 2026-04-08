@@ -93,7 +93,7 @@ RULES:
 /**
  * Send a single email via Gmail API using the user's connected Google account.
  */
-async function sendEmail({ to, subject, body, fromName, userId }) {
+async function sendEmail({ to, subject, body, htmlBody, fromName, userId }) {
   if (!userId) {
     throw new Error('User ID is required to send email via connected Google account.');
   }
@@ -107,7 +107,9 @@ async function sendEmail({ to, subject, body, fromName, userId }) {
   const gmail = google.gmail({ version: 'v1', auth: client });
 
   const boundary = `----=_Part_${crypto.randomBytes(16).toString('hex')}`;
-  const htmlBody = body.split('\n').map((l) => (l.trim() ? `<p>${l}</p>` : '')).join('');
+  
+  // Use provided htmlBody if available, otherwise convert plain text to HTML
+  const finalHtmlBody = htmlBody || body.split('\n').map((l) => (l.trim() ? `<p>${l}</p>` : '')).join('');
 
   const str = [
     `To: ${to}`,
@@ -122,8 +124,9 @@ async function sendEmail({ to, subject, body, fromName, userId }) {
     body,
     `--${boundary}`,
     'Content-Type: text/html; charset=utf-8',
+    'Content-Transfer-Encoding: 7bit',
     '',
-    htmlBody,
+    finalHtmlBody,
     `--${boundary}--`
   ].join('\r\n');
 

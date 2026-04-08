@@ -23,7 +23,11 @@ export async function POST(req: Request) {
     const pass = process.env.ZOHO_SMTP_PASS || process.env.ZOHO_APP_PASSWORD || process.env.SMTP_PASS;
     const fromEmail = process.env.ZOHO_FROM || user;
 
+    console.log(`[api/send-email] 📧 Sending from: ${fromEmail} to: ${to}`);
+    console.log(`[api/send-email] Using SMTP: ${host}:${port}`);
+
     if (!user || !pass || !fromEmail) {
+      console.error(`[api/send-email] ❌ Missing credentials. user=${!!user}, pass=${!!pass}, fromEmail=${!!fromEmail}`);
       return NextResponse.json(
         { error: 'Missing SMTP credentials (ZOHO_SMTP_USER/ZOHO_SMTP_PASS/ZOHO_FROM)' },
         { status: 500 }
@@ -49,11 +53,13 @@ export async function POST(req: Request) {
       text: body,
     };
 
+    console.log(`[api/send-email] 📤 Sending email...`);
     const info = await transporter.sendMail(mailOptions);
 
+    console.log(`[api/send-email] ✅ Email sent successfully. MessageId: ${info.messageId}`);
     return NextResponse.json({ ok: true, messageId: info.messageId, accepted: info.accepted });
   } catch (error) {
-    console.error('Email send failed', error);
+    console.error('[api/send-email] ❌ Email send failed', error);
     const message = error instanceof Error ? error.message : 'Failed to send email';
     return NextResponse.json({ error: 'Failed to send email', details: message }, { status: 500 });
   }

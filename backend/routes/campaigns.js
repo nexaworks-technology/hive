@@ -41,7 +41,17 @@ router.get('/', async (req, res) => {
     return res.status(500).json({ error: 'Failed to list campaigns', details: dbError.message });
   }
 
-  return res.json({ campaigns: data || [] });
+  // Format campaigns with available fields
+  const formattedCampaigns = (data || []).map((campaign) => ({
+    id: campaign.id,
+    domain: campaign.targetCompany || '-',
+    totalFound: 0,
+    totalEnrolled: 0,
+    status: campaign.status || 'unknown',
+    createdAt: campaign.created_at,
+  }));
+
+  return res.json({ campaigns: formattedCampaigns });
 });
 
 // Get a single campaign (includes payload like leads/sentEmails/stats if stored).

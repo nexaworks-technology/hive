@@ -48,6 +48,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const [showGoogleAuth, setShowGoogleAuth] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
+  const [integratedGmailEmail, setIntegratedGmailEmail] = useState<string | null>(null);
   const [selectedSection, setSelectedSection] = useState('general');
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
@@ -99,7 +100,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     const loadCampaigns = async () => {
       setIsLoadingCampaigns(true);
       try {
-        const res = await fetch(`${apiBaseUrl}/campaigns`, {
+        const res = await fetch(`${apiBaseUrl}/campaigns-v2`, {
           headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
         });
         if (!res.ok) throw new Error('Failed to fetch campaigns');
@@ -114,30 +115,44 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
     if (session) {
       loadCampaigns();
+      
+      // Poll campaigns every 5 seconds to show newly created/scraped campaigns in real-time
+      const pollInterval = setInterval(() => {
+        loadCampaigns();
+      }, 5000);
+      
+      return () => clearInterval(pollInterval);
     }
-  }, [apiBaseUrl, workflowState?.campaignHistory?.length, session]);
+  }, [apiBaseUrl, session]);
 
   useEffect(() => {
     const fetchGoogleStatus = async () => {
       if (!session) {
         setGoogleConnected(false);
+        setIntegratedGmailEmail(null);
         return;
       }
       try {
-        const res = await fetch(`${apiBaseUrl}/google/status`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
+        // Use simple endpoint that doesn't require auth
+        const res = await fetch(`${apiBaseUrl}/google/status-simple`);
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(payload?.error || 'Failed to check Google status');
         setGoogleConnected(Boolean(payload?.connected));
+        // Get the integrated Gmail email from backend response
+        if (payload?.connected) {
+          setIntegratedGmailEmail(payload?.email || payload?.gmail_email || null);
+        } else {
+          setIntegratedGmailEmail(null);
+        }
       } catch (error) {
         console.error('Failed to check Google status', error);
         setGoogleConnected(false);
+        setIntegratedGmailEmail(null);
       }
     };
 
     fetchGoogleStatus();
-  }, [apiBaseUrl, session]);
+  }, [apiBaseUrl, session, settingsOpen]);
 
   return (
     <div
@@ -160,7 +175,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           <div
             className={`text-2xl font-bold text-primary transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 w-0'}`}
           >
-            Hive
+            Hive <span className="text-sm">SutraHR</span>
           </div>
         </div>
         <Button
@@ -198,20 +213,12 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           variant="ghost"
           className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
           onClick={() => {
-            if (!session) {
-              router.push(`/login?redirect=${encodeURIComponent('/')}`);
-              return;
-            }
-            if (googleConnected) {
-              setActiveTab('stage-1');
-              router.push('/');
-            } else {
-              setShowGoogleAuth(true);
-            }
+            setActiveTab('campaigns');
+            router.push('/campaigns');
           }}
         >
-          <SquarePen className="w-8 h-8" />
-          <span className={isOpen ? 'inline-flex' : 'hidden'}>New Campaign</span>
+          <Mail className="w-8 h-8" />
+          <span className={isOpen ? 'inline-flex' : 'hidden'}>Outbound Campaigns</span>
         </Button>
         <div className="mt-0">
           <Button
@@ -229,14 +236,6 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           <Button
             variant="ghost"
             className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
-            onClick={() => router.push('/profile')}
-          >
-            <Settings className="w-8 h-8" />
-            <span className={isOpen ? 'inline-flex' : 'hidden'}>Company/My Profile</span>
-          </Button>
-          <Button
-            variant="ghost"
-            className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
             onClick={() => {
               if (googleConnected) {
                 router.push('/inbound');
@@ -247,17 +246,6 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           >
             <Inbox className="w-8 h-8" />
             <span className={isOpen ? 'inline-flex' : 'hidden'}>Inbound</span>
-          </Button>
-          <Button
-            variant="ghost"
-            className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
-            onClick={() => {
-              setActiveTab('campaigns');
-              router.push('/campaigns');
-            }}
-          >
-            <Mail className="w-8 h-8" />
-            <span className={isOpen ? 'inline-flex' : 'hidden'}>Outbound Campaigns</span>
           </Button>
           <Button
             variant="ghost"
@@ -274,7 +262,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <span>campaigns</span>
             <ChevronRight className="w-5 h-5" />
           </div>
-          <div className={`${isOpen ? 'mt-2 max-h-[70vh] overflow-y-auto space-y-1 pr-1' : 'hidden'}`}>
+          <div className={`${isOpen ? 'mt-2 max-h-[30vh] overflow-y-auto space-y-1 pr-1' : 'hidden'}`}>
             {isLoadingCampaigns ? (
               <div className="space-y-1 pr-1" aria-label="Loading campaigns">
                 {[0, 1, 2].map((i) => (
@@ -291,16 +279,18 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 <Button
                   key={campaign.id}
                   variant="ghost"
-                  className="w-full justify-start text-left text-sm px-2 h-9 text-sidebar-foreground hover:text-black hover:bg-[#efefef] dark:hover:bg-[#303030]"
+                  className="w-full justify-start text-left text-sm px-2 h-auto py-2 text-sidebar-foreground hover:text-black hover:bg-[#efefef] dark:hover:bg-[#303030]"
                   onClick={() => {
                     workflowManager.setState({ currentCampaignId: campaign.id });
                     setActiveTab('history');
                     router.push(`/dashboard/${campaign.id}`);
                   }}
                 >
-                  <span className="truncate" title={campaign.title || campaign.targetAudience || campaign.id}>
-                    {campaign.title || campaign.targetAudience || campaign.id}
-                  </span>
+                  <div className="flex flex-col gap-0.5 w-full">
+                    <span className="truncate font-semibold text-sm" title={campaign.domain || campaign.id}>
+                      {campaign.domain || campaign.id}
+                    </span>
+                  </div>
                 </Button>
               ))
             )}
@@ -328,6 +318,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 <div className="text-lg font-semibold mb-4">Settings</div>
                 {[
                   { key: 'general', label: 'General', icon: <SlidersHorizontal className="w-5 h-5 mr-2 inline" /> },
+                  { key: 'profile', label: 'Outreach Profile', icon: <User className="w-5 h-5 mr-2 inline" /> },
                   { key: 'edit-email', label: 'Edit Email', icon: <Mail className="w-5 h-5 mr-2 inline" /> },
                   { key: 'calendar', label: 'Calendar', icon: <Calendar className="w-5 h-5 mr-2 inline" /> },
                   { key: 'account', label: 'Account', icon: <User className="w-5 h-5 mr-2 inline" /> },
@@ -357,6 +348,27 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                           <Switch checked={isDarkMode} onCheckedChange={setIsDarkMode} />
                         </div>
                       </div>
+                    </div>
+                  </>
+                )}
+                {selectedSection === 'profile' && (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl mb-4">Outreach Profile</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <p className="text-muted-foreground text-sm mb-4">
+                        Configure your personal profile to personalize all cold emails. This includes your name, contact info, and Calendly link for scheduling.
+                      </p>
+                      <button
+                        className="px-5 py-2 bg-primary text-white rounded-md font-semibold w-fit hover:bg-primary/90 transition-colors"
+                        onClick={() => {
+                          window.open('/settings/profile', '_blank');
+                          setSettingsOpen(false);
+                        }}
+                      >
+                        Edit Profile →
+                      </button>
                     </div>
                   </>
                 )}
@@ -390,9 +402,84 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 {selectedSection === 'account' && (
                   <>
                     <DialogHeader>
-                      <DialogTitle className="text-2xl mb-4">Account</DialogTitle>
+                      <DialogTitle className="text-2xl mb-4">Account Settings</DialogTitle>
                     </DialogHeader>
-                    <div className="text-muted-foreground">Account settings coming soon.</div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-semibold block mb-2">Full Name</label>
+                        <input
+                          type="text"
+                          defaultValue={profileName}
+                          className="w-full px-3 py-2 border border-border rounded-md text-sm"
+                          placeholder="Your name"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold block mb-2">Gmail Integration</label>
+                        {googleConnected && integratedGmailEmail ? (
+                          <>
+                            <input
+                              type="email"
+                              defaultValue={integratedGmailEmail}
+                              className="w-full px-3 py-2 border border-green-200 rounded-md text-sm bg-green-50 cursor-not-allowed"
+                              disabled
+                            />
+                            <p className="text-xs text-green-700 mt-1">✓ Connected for sending campaigns</p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-full px-3 py-2 border border-border rounded-md text-sm bg-muted text-muted-foreground">
+                              Not connected
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">Click Settings → Edit Email to connect</p>
+                          </>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold block mb-2">Calendar Integration</label>
+                        {googleConnected && integratedGmailEmail ? (
+                          <>
+                            <input
+                              type="email"
+                              defaultValue={integratedGmailEmail}
+                              className="w-full px-3 py-2 border border-green-200 rounded-md text-sm bg-green-50 cursor-not-allowed"
+                              disabled
+                            />
+                            <p className="text-xs text-green-700 mt-1">✓ Connected for scheduling</p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-full px-3 py-2 border border-border rounded-md text-sm bg-muted text-muted-foreground">
+                              Not connected
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">Click Settings → Calendar to connect</p>
+                          </>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold block mb-2">Company</label>
+                        <input
+                          type="text"
+                          defaultValue="Your Company"
+                          className="w-full px-3 py-2 border border-border rounded-md text-sm"
+                          placeholder="Company name"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold block mb-2">Location</label>
+                        <input
+                          type="text"
+                          defaultValue="City, State"
+                          className="w-full px-3 py-2 border border-border rounded-md text-sm"
+                          placeholder="City, State"
+                        />
+                      </div>
+                      <div className="pt-4 flex gap-2">
+                        <Button className="bg-primary text-white hover:bg-primary/90">
+                          Save Changes
+                        </Button>
+                      </div>
+                    </div>
                   </>
                 )}
                 {/* No Close button as requested */}
