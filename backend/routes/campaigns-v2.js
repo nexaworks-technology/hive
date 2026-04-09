@@ -226,10 +226,29 @@ router.post('/create', async (req, res) => {
  * GET /campaigns/:campaignId
  * Get campaign details
  */
-router.get('/:campaignId', (req, res) => {
+router.get('/:campaignId', async (req, res) => {
   try {
     const { campaignId } = req.params;
     const result = campaignManager.getCampaign(campaignId);
+
+    // If not in memory, try to fetch from database
+    if (!result.success && result.error) {
+      const { data: dbCampaign, error: dbError } = await supabase
+        .from('sutra_campaigns')
+        .select('*')
+        .eq('id', campaignId)
+        .single();
+
+      if (dbError || !dbCampaign) {
+        return res.json(result); // Return the original error
+      }
+
+      // Return the database campaign
+      return res.json({
+        success: true,
+        campaign: dbCampaign
+      });
+    }
 
     res.json(result);
   } catch (error) {
