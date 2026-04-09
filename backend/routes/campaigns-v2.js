@@ -1563,17 +1563,15 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
               .insert({
                 prospect_id: prospectDbId,
                 campaign_id: campaignId,
-                from_email: fromEmail,
+                reply_from: fromEmail,
                 subject: subjectHeader,
                 body: replyText,
-                reply_intent: intent,
+                detected_objection: intent,
                 sentiment: intent === 'positive' ? 'positive' : intent === 'not-interested' ? 'negative' : 'neutral',
-                received_at: new Date().toISOString(),
-                auto_reply_sent: autoReplySent,
-                auto_reply_subject: autoReplyBody.subject,
-                auto_reply_body: autoReplyBody.body,
-                auto_reply_error: autoReplyError || null,
-                gmail_message_id: msg.id
+                reply_date: new Date().toISOString(),
+                user_responded: false,
+                suggested_response: autoReplyBody.body,
+                notes: autoReplyError || null
               });
 
             if (insertReplyErr) {
@@ -1672,7 +1670,7 @@ router.get('/:campaignId/prospects/:prospectId/replies', async (req, res) => {
       .from('prospect_replies')
       .select('*')
       .eq('prospect_id', dbProspect.id)
-      .order('received_at', { ascending: false });
+      .order('reply_date', { ascending: false });
 
     if (repliesError) {
       console.error('[get-replies] Database error:', repliesError.message);

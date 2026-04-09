@@ -10,15 +10,14 @@ import { useSessionContext } from '@/components/auth-provider';
 
 interface Reply {
   id: string;
-  from_email: string;
+  reply_from: string;
   subject: string;
   body: string;
-  reply_intent: string;
+  detected_objection: string;
   sentiment: string;
-  received_at: string;
-  auto_reply_sent: boolean;
-  auto_reply_subject: string;
-  auto_reply_body: string;
+  reply_date: string;
+  user_responded: boolean;
+  suggested_response: string;
 }
 
 interface ReplyHistoryModalProps {
@@ -163,19 +162,19 @@ export default function ReplyHistoryModal({
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">
-                        {reply.from_email}
+                        {reply.reply_from}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {formatDate(reply.received_at)}
+                        {formatDate(reply.reply_date)}
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Badge className={`${getIntentColor(reply.reply_intent)}`}>
-                        {reply.reply_intent}
+                      <Badge className={`${getIntentColor(reply.detected_objection)}`}>
+                        {reply.detected_objection}
                       </Badge>
-                      {reply.auto_reply_sent && (
+                      {reply.user_responded && (
                         <Badge variant="outline" className="bg-green-50">
-                          ✓ Auto-replied
+                          ✓ Responded
                         </Badge>
                       )}
                     </div>
@@ -193,17 +192,18 @@ export default function ReplyHistoryModal({
                         <p className="text-foreground whitespace-pre-wrap break-words">
                           {reply.body}
                         </p>
-                        {reply.auto_reply_sent && (
+                        {reply.user_responded && (
                           <div className="mt-4 pt-4 border-t border-muted space-y-2">
                             <p className="text-xs font-semibold text-muted-foreground">
-                              Auto-reply sent:
+                              You responded to this
                             </p>
-                            <div className="bg-green-50 rounded p-2 text-xs">
-                              <p className="font-medium">{reply.auto_reply_subject}</p>
-                              <p className="mt-1 text-green-800">
-                                {reply.auto_reply_body}
-                              </p>
-                            </div>
+                            {reply.suggested_response && (
+                              <div className="bg-green-50 rounded p-2 text-xs">
+                                <p className="text-green-800">
+                                  {reply.suggested_response}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </>
