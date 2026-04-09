@@ -1710,4 +1710,332 @@ router.get('/:campaignId/prospects/:prospectId/replies', async (req, res) => {
   }
 });
 
+/**
+ * POST /campaigns-v2/:campaignId/send-huma-emails
+ * Send campaign emails from Huma's Google Workspace account
+ */
+router.post('/:campaignId/send-huma-emails', requireAuth, async (req, res) => {
+  const { campaignId } = req.params;
+  const { prospects: prospectsList, emailTemplate } = req.body;
+
+  try {
+    console.log(`[send-huma-emails] Sending emails to ${prospectsList?.length || 0} prospects from ${process.env.HUMA_EMAIL}`);
+
+    if (!prospectsList || !Array.isArray(prospectsList) || prospectsList.length === 0) {
+      return res.status(400).json({ error: 'Missing or empty prospects list' });
+    }
+
+    if (!process.env.HUMA_SERVICE_ACCOUNT_JSON) {
+      return res.status(500).json({ error: 'Huma email service account not configured' });
+    }
+
+    // Import Huma Gmail utilities
+    const { sendHumaEmail } = await import('../utils/huma-gmail.js');
+
+    const results = {
+      success: true,
+      campaignId,
+      totalProspects: prospectsList.length,
+      emailsSent: 0,
+      emailsFailed: 0,
+      details: []
+    };
+
+    for (const prospect of prospectsList) {
+      try {
+        if (!prospect.email) {
+          console.error(`[send-huma-emails] Prospect missing email: ${prospect.name}`);
+          results.emailsFailed++;
+          results.details.push({
+            name: prospect.name,
+            email: prospect.email,
+            success: false,
+            error: 'Missing email address'
+          });
+          continue;
+        }
+
+        // Generate email subject and body
+        let subject = emailTemplate?.subject || `Message for ${prospect.name}`;
+        let body = emailTemplate?.body || `Hi ${prospect.name},\n\nWe'd like to connect!\n\nBest regards,\nHuma`;
+
+        // Replace template variables
+        if (emailTemplate?.hasTemplate) {
+          body = body
+            .replace(/\{name\}/g, prospect.name)
+            .replace(/\{company\}/g, prospect.company || '')
+            .replace(/\{role\}/g, prospect.role || '');
+        }
+
+        // Send email via Huma's account
+        await sendHumaEmail({
+          to: prospect.email,
+          subject,
+          body
+        });
+
+        results.emailsSent++;
+        results.details.push({
+          name: prospect.name,
+          email: prospect.email,
+          success: true
+        });
+
+        console.log(`[send-huma-emails] ✅ Sent to ${prospect.email}`);
+
+      } catch (emailErr) {
+        console.error(`[send-huma-emails] Failed to send to ${prospect.email}:`, emailErr.message);
+        results.emailsFailed++;
+        results.details.push({
+          name: prospect.name,
+          email: prospect.email,
+          success: false,
+          error: emailErr.message
+        });
+      }
+    }
+
+    res.json(results);
+
+  } catch (error) {
+    console.error('[send-huma-emails] error:', error);
+    res.status(500).json({ error: error.message || 'Failed to send Huma emails' });
+  }
+});
+
+/**
+ * POST /campaigns-v2/:campaignId/check-huma-replies
+ * Check for replies on Huma's email account
+ */
+router.post('/:campaignId/check-huma-replies', requireAuth, async (req, res) => {
+  const { campaignId } = req.params;
+  const { prospectsList } = req.body;
+
+  try {
+    console.log(`[check-huma-replies] Checking ${prospectsList?.length || 0} prospects for replies`);
+
+    if (!process.env.HUMA_SERVICE_ACCOUNT_JSON) {
+      return res.status(500).json({ error: 'Huma email service account not configured' });
+    }
+
+    if (!prospectsList || !Array.isArray(prospectsList) || prospectsList.length === 0) {
+      return res.json({
+        success: true,
+        campaignId,
+        repliesFound: 0,
+        repliesProcessed: 0,
+        prospectUpdates: [],
+        totalProspects: 0,
+        message: 'No prospects to check for replies'
+      });
+    }
+
+    // Import Huma Gmail utilities
+    const { getUnreadEmails, getThreadReplies, markAsRead } = await import('../utils/huma-gmail.js');
+    const OpenRouter = (await import('openrouter')).default;
+
+    // Build email list for search
+    const prospectEmails = prospectsList.map(p => p.email).filter(Boolean);
+    const searchQuery = prospectEmails.map(email => `from:${email}`).join(' OR ');
+
+    let messages = [];
+    try {
+      const unreadMessages = await getUnreadEmails(searchQuery);
+      messages = unreadMessages;
+      console.log(`[check-huma-replies] Found ${messages.length} unread emails from prospects`);
+    } catch (gmailErr) {
+      console.error('[check-huma-replies] Gmail search error:', gmailErr.message);
+      return res.status(500).json({ error: 'Failed to search Gmail: ' + gmailErr.message });
+    }
+
+    let repliesProcessed = 0;
+    const prospectUpdates = [];
+
+    for (const msg of messages) {
+      try {
+        const headers = msg.data.payload.headers || [];
+        const fromHeader = headers.find(h => h.name === 'From');
+        const subjectHeader = headers.find(h => h.name === 'Subject');
+        const dateHeader = headers.find(h => h.name === 'Date');
+
+        const fromEmail = fromHeader?.value || '';
+        const fromEmailMatch = fromEmail.match(/<(.+?)>/);
+        const fromEmailClean = fromEmailMatch ? fromEmailMatch[1] : fromEmail;
+
+        // Find matching prospect
+        const prospect = prospectsList.find(
+          p => p.email.toLowerCase() === fromEmailClean.toLowerCase()
+        );
+
+        if (!prospect) {
+          console.log(`[check-huma-replies] No prospect found for ${fromEmailClean}, skipping`);
+          continue;
+        }
+
+        // Extract reply body
+        let replyBody = '';
+        let replyText = '';
+        try {
+          const parts = msg.data.payload.parts || [];
+          const textPart = parts.find(p => p.mimeType === 'text/plain');
+          const htmlPart = parts.find(p => p.mimeType === 'text/html');
+          
+          if (textPart?.body?.data) {
+            replyText = Buffer.from(textPart.body.data, 'base64').toString();
+          } else if (htmlPart?.body?.data) {
+            replyText = Buffer.from(htmlPart.body.data, 'base64').toString().replace(/<[^>]*>/g, '');
+          } else if (msg.data.payload.body?.data) {
+            replyText = Buffer.from(msg.data.payload.body.data, 'base64').toString();
+          }
+        } catch (bodyErr) {
+          console.error('[check-huma-replies] Error extracting reply body:', bodyErr.message);
+          replyText = '(Unable to extract reply text)';
+        }
+
+        // Classify reply intent
+        let intent = 'inquiry';
+        let detectedObjection = null;
+        try {
+          const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+          if (!openRouterApiKey) throw new Error('OPENROUTER_API_KEY not configured');
+
+          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openRouterApiKey}`,
+              'HTTP-Referer': 'http://localhost:3000'
+            },
+            body: JSON.stringify({
+              model: 'meta-llama/llama-2-70b-chat',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are an email classification expert. Classify the email intent and detect any objections. Return JSON with: { "intent": "positive|question|objection|not_interested|out_of_office", "objection": "your detected objection or null", "sentiment": "positive|neutral|negative" }'
+                },
+                {
+                  role: 'user',
+                  content: `Classify this reply from a prospect:\n\n${replyText.substring(0, 500)}`
+                }
+              ]
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const classification = JSON.parse(data.choices[0].message.content);
+            intent = classification.intent || 'inquiry';
+            detectedObjection = classification.objection;
+          }
+        } catch (aiErr) {
+          console.error('[check-huma-replies] AI classification error:', aiErr.message);
+        }
+
+        // Save reply to database
+        try {
+          // Find or create prospect in database
+          const { data: existingProspect, error: prospectFetchErr } = await supabase
+            .from('prospects')
+            .select('id')
+            .eq('email', prospect.email)
+            .single();
+
+          let prospectDbId;
+          if (existingProspect) {
+            prospectDbId = existingProspect.id;
+          } else {
+            const { data: newProspect, error: insertProspectErr } = await supabase
+              .from('prospects')
+              .insert({
+                campaign_id: campaignId,
+                name: prospect.name,
+                email: prospect.email,
+                role: prospect.role,
+                company: prospect.company,
+                linkedin_profile: prospect.linkedinProfile || null,
+                industry: prospect.industry || null,
+                status: 'replied'
+              })
+              .select('id')
+              .single();
+
+            if (insertProspectErr) {
+              console.error('[check-huma-replies] Failed to insert prospect:', insertProspectErr.message);
+              continue;
+            }
+            prospectDbId = newProspect.id;
+          }
+
+          // Insert reply
+          const { error: insertReplyErr } = await supabase
+            .from('prospect_replies')
+            .insert({
+              prospect_id: prospectDbId,
+              campaign_id: campaignId,
+              reply_from: prospect.email,
+              subject: subjectHeader?.value || '(no subject)',
+              body: replyText,
+              detected_objection: detectedObjection,
+              sentiment: 'neutral',
+              reply_date: new Date(dateHeader?.value || Date.now()).toISOString(),
+              user_responded: false
+            });
+
+          if (insertReplyErr) {
+            console.error('[check-huma-replies] Failed to save reply to DB:', insertReplyErr.message);
+          } else {
+            console.log(`[check-huma-replies] ✅ Reply saved to database for ${prospect.email}`);
+          }
+
+          // Update prospect status
+          const { error: updateErr } = await supabase
+            .from('prospects')
+            .update({ status: 'replied', updated_at: new Date().toISOString() })
+            .eq('id', prospectDbId);
+
+          if (updateErr) {
+            console.error('[check-huma-replies] Failed to update prospect status:', updateErr.message);
+          }
+        } catch (dbErr) {
+          console.error('[check-huma-replies] Database error:', dbErr.message);
+        }
+
+        // Mark email as read
+        try {
+          await markAsRead(msg.id);
+        } catch (markErr) {
+          console.error('[check-huma-replies] Failed to mark as read:', markErr.message);
+        }
+
+        prospectUpdates.push({
+          prospectId: prospect.id,
+          prospectEmail: prospect.email,
+          replied: true,
+          replyIntent: intent,
+          detectedObjection: detectedObjection
+        });
+
+        repliesProcessed++;
+
+      } catch (msgErr) {
+        console.error('[check-huma-replies] Error processing message:', msgErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      campaignId,
+      repliesFound: messages.length,
+      repliesProcessed,
+      prospectUpdates,
+      totalProspects: prospectsList?.length || 0,
+      message: repliesProcessed > 0 ? `✅ Processed ${repliesProcessed} replies` : 'No new replies found'
+    });
+
+  } catch (error) {
+    console.error('[check-huma-replies] error:', error);
+    res.status(500).json({ error: error.message || 'Failed to check Huma replies' });
+  }
+});
+
 export default router;
