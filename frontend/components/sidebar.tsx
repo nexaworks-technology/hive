@@ -425,13 +425,29 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                               disabled
                             />
                             <p className="text-xs text-green-700 mt-1">✓ Connected for sending campaigns</p>
+                            <button
+                              className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-md font-semibold w-fit hover:bg-blue-600 transition-colors"
+                              onClick={() => {
+                                setShowGoogleAuth(true);
+                              }}
+                            >
+                              Reconnect Gmail
+                            </button>
                           </>
                         ) : (
                           <>
                             <div className="w-full px-3 py-2 border border-border rounded-md text-sm bg-muted text-muted-foreground">
                               Not connected
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Click Settings → Edit Email to connect</p>
+                            <p className="text-xs text-muted-foreground mt-1">Connect Gmail to send outbound campaigns and receive replies</p>
+                            <button
+                              className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-md font-semibold w-fit hover:bg-blue-600 transition-colors"
+                              onClick={() => {
+                                setShowGoogleAuth(true);
+                              }}
+                            >
+                              Connect Gmail
+                            </button>
                           </>
                         )}
                       </div>

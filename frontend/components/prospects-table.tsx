@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useSessionContext } from '@/components/auth-provider';
 import ProspectModal from './prospect-modal';
 import EmailComposer from './email-composer';
 
@@ -32,12 +33,14 @@ interface ProspectsTableProps {
 }
 
 export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
+  const { session } = useSessionContext();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [showProspectModal, setShowProspectModal] = useState(false);
   const [showEmailComposer, setShowEmailComposer] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'name' | 'status' | 'replied'>('name');
+  const [checkingReplies, setCheckingReplies] = useState(false);
 
   useEffect(() => {
     fetchProspects();
@@ -53,19 +56,35 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
   // Auto-check for replies every 60 seconds
   useEffect(() => {
     const autoCheckReplies = async () => {
+      if (!session?.access_token) {
+        console.log('[prospects-table] Not checking replies - user not authenticated');
+        return;
+      }
+
       try {
         console.log(`[prospects-table] Checking for replies in campaign ${campaignId}...`);
         const res = await fetch(`http://localhost:4000/campaigns-v2/${campaignId}/check-replies`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ prospectsList: prospects })
         });
         
-        if (res.ok) {
-          const result = await res.json();
-          if (result.repliesProcessed > 0) {
-            console.log(`✅ Found ${result.repliesProcessed} replies, auto-responses sent!`);
-            await fetchProspects();
+        if (!res.ok) {
+          if (res.status === 401) {
+            console.error('[prospects-table] Unauthorized - Gmail may not be connected. Please reconnect in Settings.');
+          } else {
+            console.error(`[prospects-table] Check replies failed: ${res.statusText}`);
           }
+          return;
+        }
+
+        const result = await res.json();
+        if (result.repliesProcessed > 0) {
+          console.log(`✅ Found ${result.repliesProcessed} replies, auto-responses sent!`);
+          await fetchProspects();
         }
       } catch (e) {
         console.error('[prospects-table] Auto-check error:', e);
@@ -102,6 +121,45 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
     return sorted;
   };
 
+  const manualCheckReplies = async () => {
+    if (!session?.access_token) {
+      alert('Not authenticated. Please log in first.');
+      return;
+    }
+
+    setCheckingReplies(true);
+    try {
+      console.log(`[Manual Check] Checking for replies in campaign ${campaignId}...`);
+      const res = await fetch(`http://localhost:4000/campaigns-v2/${campaignId}/check-replies`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ prospectsList: prospects })
+      });
+      
+      if (!res.ok) {
+        if (res.status === 401) {
+          alert('Unauthorized - Gmail may not be connected. Please reconnect in Settings.');
+        } else {
+          alert(`Error checking replies: ${res.statusText}`);
+        }
+        return;
+      }
+
+      const result = await res.json();
+      console.log(`[Manual Check] Result:`, result);
+      alert(`✅ Check complete! Replies processed: ${result.repliesProcessed || 0}`);
+      await fetchProspects();
+    } catch (e) {
+      console.error('[Manual Check] Error:', e);
+      alert(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setCheckingReplies(false);
+    }
+  };
+
   if (loading) return <p className="text-center text-gray-500">Loading prospects...</p>;
 
   const sorted = getSortedProspects();
@@ -115,6 +173,15 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
           Prospects ({prospects.length} total, {sentCount} contacted, {repliedCount} replied)
         </h3>
         <div className="flex gap-2">
+          <Button
+            onClick={manualCheckReplies}
+            disabled={checkingReplies}
+            variant="outline"
+            size="sm"
+            className="bg-blue-50 text-blue-700 hover:bg-blue-100"
+          >
+            {checkingReplies ? 'Checking...' : '🔄 Check Replies'}
+          </Button>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}

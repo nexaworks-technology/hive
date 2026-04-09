@@ -1275,26 +1275,38 @@ router.get('/', async (req, res) => {
  * Check Gmail for replies to outbound campaign emails
  * Auto-send AI-powered responses and update prospect status
  */
-router.post('/:campaignId/check-replies', async (req, res) => {
+router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
   const { campaignId } = req.params;
+  const { prospectsList } = req.body;  // Accept prospects list from frontend
   
   try {
     console.log(`[check-replies] Checking for replies for campaign: ${campaignId}`);
     
-    // TEST: For now, get campaign from campaignManager (in-memory), not Supabase
-    const campaign = campaignManager.getCampaign(campaignId);
+    // Try to get campaign from memory first
+    const result = campaignManager.getCampaign(campaignId);
+    let campaign = null;
+    let prospects = null;
     
-    if (!campaign) {
+    if (result.success) {
+      // Campaign found in memory
+      campaign = result.campaign;
+      prospects = campaign.prospects || [];
+      console.log(`[check-replies] Found campaign in memory with ${prospects.length} prospects`);
+    } else if (prospectsList && Array.isArray(prospectsList)) {
+      // Use prospects passed from frontend
+      console.log(`[check-replies] Using ${prospectsList.length} prospects from frontend`);
+      prospects = prospectsList;
+    } else {
+      // No campaign in memory and no prospects from frontend
+      const allCampaigns = campaignManager.getAllCampaigns();
       return res.status(404).json({ 
-        error: `Campaign not found: ${campaignId}`,
-        availableCampaigns: campaignManager.getAllCampaigns().map(c => c.id)
+        error: `Campaign not found: ${campaignId}. Please send prospectsList in request body.`,
+        availableCampaigns: allCampaigns.campaigns?.map(c => c.id) || []
       });
     }
 
-    console.log(`[check-replies] Found campaign with ${campaign.prospects?.length || 0} prospects`);
-
     // If no prospects, return early
-    if (!campaign.prospects || campaign.prospects.length === 0) {
+    if (!prospects || prospects.length === 0) {
       return res.json({
         success: true,
         campaignId,
@@ -1302,17 +1314,20 @@ router.post('/:campaignId/check-replies', async (req, res) => {
         repliesProcessed: 0,
         prospectUpdates: [],
         totalProspects: 0,
-        message: 'No prospects in campaign yet'
+        message: 'No prospects to check for replies'
       });
     }
 
-    // Get user ID - must be from campaign
-    const userId = campaign.user_id;
+    // Get user ID from authenticated session or campaign
+    const userId = campaign?.user_id || req.user.id;
+    
     if (!userId) {
       return res.status(400).json({
-        error: 'Campaign does not have a user_id. Try creating the campaign again.'
+        error: 'Campaign does not have a user_id and user not authenticated. Try creating the campaign again.'
       });
     }
+
+    console.log(`[check-replies] Using userId: ${userId}`);
 
     let tokens;
     try {
@@ -1327,7 +1342,7 @@ router.post('/:campaignId/check-replies', async (req, res) => {
 
     if (!tokens) {
       return res.status(400).json({ 
-        error: 'Google not connected for this user',
+        error: 'Google not connected for this user. Please reconnect Gmail in Settings.',
         userId: userId  
       });
     }
@@ -1383,8 +1398,8 @@ router.post('/:campaignId/check-replies', async (req, res) => {
 
         console.log(`[check-replies] Processing email from: ${fromEmail}`);
 
-        // Find prospect in campaign with matching email
-        const prospect = campaign.prospects?.find(p => 
+        // Find prospect in list with matching email
+        const prospect = prospects?.find(p => 
           p.email?.toLowerCase() === fromEmail.toLowerCase()
         );
 
@@ -1490,6 +1505,21 @@ router.post('/:campaignId/check-replies', async (req, res) => {
         prospect.autoReplyBody = autoReplyBody.body;
         prospect.autoReplyError = autoReplyError;
         prospect.replyReceivedAt = new Date().toISOString();
+        
+        // Add to replies array (required for UI to show "Replied: Yes")
+        if (!prospect.replies) {
+          prospect.replies = [];
+        }
+        prospect.replies.push({
+          from: fromEmail,
+          subject: subjectHeader,
+          text: replyText,
+          intent: intent,
+          receivedAt: new Date().toISOString(),
+          autoReplySent: autoReplySent,
+          autoReplySubject: autoReplyBody.subject,
+          autoReplyBody: autoReplyBody.body
+        });
 
         prospectUpdates.push({
           prospectId: prospect.id,
@@ -1516,7 +1546,7 @@ router.post('/:campaignId/check-replies', async (req, res) => {
       repliesFound: messages.length,
       repliesProcessed,
       prospectUpdates,
-      totalProspects: campaign.prospects?.length || 0,
+      totalProspects: prospects?.length || 0,
       message: repliesProcessed > 0 ? `✅ Processed ${repliesProcessed} replies` : 'No new replies found'
     });
 
