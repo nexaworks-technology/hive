@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSessionContext } from '@/components/auth-provider';
 import ProspectModal from './prospect-modal';
 import EmailComposer from './email-composer';
+import ReplyHistoryModal from './reply-history-modal';
 
 interface Prospect {
   id: string;
@@ -41,6 +42,8 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
   const [showEmailComposer, setShowEmailComposer] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'name' | 'status' | 'replied'>('name');
   const [checkingReplies, setCheckingReplies] = useState(false);
+  const [showReplyHistory, setShowReplyHistory] = useState(false);
+  const [replyHistoryProspect, setReplyHistoryProspect] = useState<Prospect | null>(null);
 
   useEffect(() => {
     fetchProspects();
@@ -241,6 +244,19 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
                   >
                     View
                   </Button>
+                  {prospect.replied === 'Yes' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="bg-blue-50 text-blue-700 hover:bg-blue-100"
+                      onClick={() => {
+                        setReplyHistoryProspect(prospect);
+                        setShowReplyHistory(true);
+                      }}
+                    >
+                      📧 Replies
+                    </Button>
+                  )}
                   {prospect.mailSent !== 'Yes' && (
                     <Button
                       size="sm"
@@ -275,6 +291,14 @@ export default function ProspectsTable({ campaignId }: ProspectsTableProps) {
           setShowEmailComposer(null);
           fetchProspects();
         }}
+      />
+
+      <ReplyHistoryModal
+        isOpen={showReplyHistory}
+        onClose={() => setShowReplyHistory(false)}
+        prospectId={replyHistoryProspect?.id || ''}
+        prospectName={replyHistoryProspect?.name || ''}
+        campaignId={campaignId}
       />
     </div>
   );

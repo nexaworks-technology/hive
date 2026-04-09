@@ -1521,6 +1521,82 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
           autoReplyBody: autoReplyBody.body
         });
 
+        // ✅ NEW: Save reply to database for permanent persistence
+        try {
+          // First, ensure prospect exists in prospects table
+          const { data: existingProspect, error: selectErr } = await supabase
+            .from('prospects')
+            .select('id')
+            .eq('email', prospect.email)
+            .single();
+
+          let prospectDbId = existingProspect?.id;
+          
+          if (!existingProspect) {
+            const { data: newProspect, error: insertProspectErr } = await supabase
+              .from('prospects')
+              .insert({
+                campaign_id: campaignId,
+                name: prospect.name,
+                email: prospect.email,
+                role: prospect.role,
+                company: prospect.company,
+                linkedin_profile: prospect.linkedinProfile,
+                industry: prospect.personalizationInfo?.industry,
+                personalization_source: prospect.personalizationInfo?.source,
+                status: 'replied'
+              })
+              .select('id')
+              .single();
+            
+            if (insertProspectErr) {
+              console.error('[check-replies] Failed to insert prospect:', insertProspectErr.message);
+            } else {
+              prospectDbId = newProspect?.id;
+            }
+          }
+
+          // Then, save the reply to prospect_replies table
+          if (prospectDbId) {
+            const { error: insertReplyErr } = await supabase
+              .from('prospect_replies')
+              .insert({
+                prospect_id: prospectDbId,
+                campaign_id: campaignId,
+                from_email: fromEmail,
+                subject: subjectHeader,
+                body: replyText,
+                reply_intent: intent,
+                sentiment: intent === 'positive' ? 'positive' : intent === 'not-interested' ? 'negative' : 'neutral',
+                received_at: new Date().toISOString(),
+                auto_reply_sent: autoReplySent,
+                auto_reply_subject: autoReplyBody.subject,
+                auto_reply_body: autoReplyBody.body,
+                auto_reply_error: autoReplyError || null,
+                gmail_message_id: msg.id
+              });
+
+            if (insertReplyErr) {
+              console.error('[check-replies] Failed to save reply to DB:', insertReplyErr.message);
+            } else {
+              console.log(`[check-replies] ✅ Reply saved to database for ${fromEmail}`);
+            }
+
+            // Update prospect status to 'replied'
+            const { error: updateErr } = await supabase
+              .from('prospects')
+              .update({ status: 'replied', updated_at: new Date().toISOString() })
+              .eq('id', prospectDbId);
+
+            if (updateErr) {
+              console.error('[check-replies] Failed to update prospect status:', updateErr.message);
+            }
+          }
+        } catch (dbErr) {
+          console.error('[check-replies] Database error:', dbErr.message);
+          // Don't fail the entire check-replies operation if DB save fails
+        }
+
         prospectUpdates.push({
           prospectId: prospect.id,
           replied: true,
@@ -1553,6 +1629,67 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[check-replies] error:', error);
     res.status(500).json({ error: error.message || 'Failed to check replies' });
+  }
+});
+
+/**
+ * GET /campaigns/:campaignId/prospects/:prospectId/replies
+ * Fetch all replies for a specific prospect from the database
+ */
+router.get('/:campaignId/prospects/:prospectId/replies', async (req, res) => {
+  try {
+    const { campaignId, prospectId } = req.params;
+
+    // Get prospect from memory first to find email
+    const prospectResult = campaignManager.getProspectDetails(prospectId);
+    if (!prospectResult.success) {
+      return res.status(404).json({ error: 'Prospect not found' });
+    }
+
+    const prospect = prospectResult.prospect;
+    const prospectEmail = prospect.email;
+
+    // Find prospect in database by email
+    const { data: dbProspect, error: prospectError } = await supabase
+      .from('prospects')
+      .select('id')
+      .eq('email', prospectEmail)
+      .single();
+
+    if (prospectError || !dbProspect) {
+      // No database record yet, return empty replies
+      return res.json({
+        success: true,
+        prospectId,
+        prospectEmail,
+        replies: [],
+        message: 'No replies found in database'
+      });
+    }
+
+    // Fetch all replies for this prospect from database
+    const { data: replies, error: repliesError } = await supabase
+      .from('prospect_replies')
+      .select('*')
+      .eq('prospect_id', dbProspect.id)
+      .order('received_at', { ascending: false });
+
+    if (repliesError) {
+      console.error('[get-replies] Database error:', repliesError.message);
+      return res.status(500).json({ error: 'Failed to fetch replies from database' });
+    }
+
+    res.json({
+      success: true,
+      prospectId,
+      prospectEmail,
+      prospectName: prospect.name,
+      replies: replies || [],
+      totalReplies: replies?.length || 0
+    });
+  } catch (error) {
+    console.error('[get-replies] Error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to get replies' });
   }
 });
 
