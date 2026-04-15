@@ -19,7 +19,7 @@ interface CampaignModalProps {
  * Generate follow-up email templates
  */
 function generateFollowUpEmail(prospect: any, userProfile: UserProfile | Record<string, any>, dayNumber: number): { html: string; subject: string; body: string } {
-  const name = prospect.name || 'there';
+  const name = prospect.name || 'Sir/Ma\'am';
   const company = prospect.company || 'your company';
   const profile = userProfile as UserProfile;
   
@@ -70,7 +70,7 @@ function generateFollowUpEmail(prospect: any, userProfile: UserProfile | Record<
         
         <div class="content">
           <div class="badge">Follow-up Message</div>
-          <div class="greeting">Hey ${name},</div>
+          <div class="greeting">Hello ${name},</div>
           <div class="body-text">${followUpMessage}</div>
           <div class="body-text">
             We specialize in placing talent fast - without the per-hire fees or long contracts that slow things down.
@@ -109,7 +109,7 @@ function generateFollowUpEmail(prospect: any, userProfile: UserProfile | Record<
  * Generate professional HTML email template with user profile details
  */
 function generateHtmlEmail(prospect: any, userProfile: UserProfile): string {
-  const name = prospect.name || 'there';
+  const name = prospect.name || 'Sir/Ma\'am';
   const company = prospect.company || 'your company';
   
   return `
@@ -148,7 +148,7 @@ function generateHtmlEmail(prospect: any, userProfile: UserProfile): string {
         </div>
         
         <div class="content">
-          <div class="greeting">Hey ${name},</div>
+          <div class="greeting">Hello ${name},</div>
           
           <div class="body-text">
             I noticed ${company} is scaling rapidly and probably in growth mode with hiring. 
@@ -181,7 +181,7 @@ function generateHtmlEmail(prospect: any, userProfile: UserProfile): string {
             Would a quick 15-min call to explore how this works for ${company} make sense?
           </div>
           
-          <a href="${userProfile.calendlyLink}" class="cta-button">Book a 15-min Call</a>
+          <a href="${userProfile.calendlyLink}" class="cta-button" style="color: white !important;">Book a 15-min Call</a>
           
           <div class="divider"></div>
           
