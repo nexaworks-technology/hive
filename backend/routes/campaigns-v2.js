@@ -10,6 +10,7 @@ import scrapeLeadsRouter, { searchCompanies, fetchHunterLead } from './scrape-le
 import { enrollProspectInSequence, checkAndFireDueTouches, fireTouchForProspect } from '../utils/sequence-trigger.js';
 import { enrichFromHunter, enrichDefault } from '../utils/hunter-enricher.js';
 import { getSimpleEmailTemplate } from '../utils/simple-template.js';
+import { generateCategoryWiseReply } from '../utils/category-wise-replies.js';
 import { supabase } from '../supabase-client.js';
 
 const router = express.Router();
@@ -158,6 +159,7 @@ router.post('/create', async (req, res) => {
           // Wait for all Hunter API calls at once
           const allResults = await Promise.all(hunterPromises);
           const flatLeads = allResults.flat();
+          console.log(`[campaigns-v2] 📊 Hunter total results: ${flatLeads.length} leads from ${domains.length} domains`);
 
           // Add all contacts from all domains
           if (flatLeads && Array.isArray(flatLeads) && flatLeads.length > 0) {
@@ -182,6 +184,39 @@ router.post('/create', async (req, res) => {
         if (scrapedLeads.length > 0) {
           const addResult = campaignManager.addProspectsFromScrapedLeads(campaign.id, scrapedLeads);
           console.log(`[campaigns-v2] Added ${addResult.totalAdded} prospects to campaign ${campaign.id}`);
+          
+          // ✅ SAVE SCRAPED LEADS TO SUPABASE
+          try {
+            console.log(`[campaigns-v2] 🔄 Starting DB insert for ${scrapedLeads.length} leads...`);
+            const prospectRecords = scrapedLeads.map(lead => ({
+              campaign_id: campaign.id,
+              name: lead.name,
+              email: lead.email,
+              role: lead.title || 'Unknown',
+              company: lead.company || campaignData.targetCompany,
+              linkedin_profile: lead.linkedin || null,
+              industry: lead.industry || null,
+              status: 'pending',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }));
+
+            console.log(`[campaigns-v2] Inserting ${prospectRecords.length} prospects:`, prospectRecords.slice(0, 1)); // Log first one
+
+            const { data: inserted, error: insertError } = await supabase
+              .from('prospects')
+              .insert(prospectRecords);
+
+            if (insertError) {
+              console.error(`[campaigns-v2] ❌ Error saving ${scrapedLeads.length} prospects to Supabase:`, insertError.message, insertError.details, insertError.hint);
+            } else {
+              console.log(`[campaigns-v2] ✅ Saved ${scrapedLeads.length} prospects to Supabase for campaign ${campaign.id}`);
+            }
+          } catch (dbErr) {
+            console.error(`[campaigns-v2] ❌ Exception saving prospects to Supabase:`, dbErr.message);
+          }
+        } else {
+          console.warn(`[campaigns-v2] ⚠️  NO LEADS SCRAPED - skipping DB save`);
         }
         
         // Save campaign to sutra_campaigns table
@@ -193,13 +228,8 @@ router.post('/create', async (req, res) => {
             domain: domain,
             status: scrapedLeads.length > 0 ? 'ready' : 'no-leads',
             total_found: scrapedLeads.length,
-            total_enrolled: 0,
             created_at: new Date().toISOString(),
-            metadata: JSON.stringify({
-              campaignType: campaignData.campaignType,
-              description: campaignData.description,
-              targetCompany: campaignData.targetCompany
-            })
+            updated_at: new Date().toISOString()
           }]);
           
           if (error) {
@@ -224,35 +254,162 @@ router.post('/create', async (req, res) => {
 
 /**
  * GET /campaigns/:campaignId
- * Get campaign details
+ * Get campaign details with prospects and reply data from database
  */
 router.get('/:campaignId', async (req, res) => {
   try {
     const { campaignId } = req.params;
-    const result = campaignManager.getCampaign(campaignId);
 
-    // If not in memory, try to fetch from database
-    if (!result.success && result.error) {
-      const { data: dbCampaign, error: dbError } = await supabase
+    // Try memory first
+    let campaign = campaignManager.getCampaign(campaignId);
+    
+    // Always fetch latest prospects from database (don't rely on stale memory)
+    let dbProspects = [];
+    let dbCampaign = null;
+    
+    try {
+      // Fetch campaign metadata from database
+      const { data: campaignData, error: campaignError } = await supabase
         .from('sutra_campaigns')
         .select('*')
         .eq('id', campaignId)
         .single();
-
-      if (dbError || !dbCampaign) {
-        return res.json(result); // Return the original error
+      
+      if (!campaignError && campaignData) {
+        dbCampaign = campaignData;
+      }
+      
+      // Always fetch latest prospects for this campaign
+      const { data: prospects, error: prospectError } = await supabase
+        .from('prospects')
+        .select('*')
+        .eq('campaign_id', campaignId);
+      
+      if (prospectError) {
+        console.error(`[campaigns-v2] Error fetching prospects for campaign ${campaignId}:`, prospectError.message);
+      } else {
+        console.log(`[campaigns-v2] ✅ Fetched ${prospects?.length || 0} prospects for campaign ${campaignId}`);
       }
 
-      // Return the database campaign
+      if (!prospectError && prospects) {
+        dbProspects = prospects;
+      }
+    } catch (dbErr) {
+      console.error('[campaigns-v2] Database error:', dbErr.message);
+    }
+
+    // If we have database prospects, use those (always prefer database over memory)
+    if (dbProspects.length > 0 || dbCampaign) {
+      // Fetch reply counts for each prospect
+      const prospectIds = dbProspects.map(p => p.id);
+      let replyCountMap = {};
+      
+      if (prospectIds.length > 0) {
+        const { data: replyCounts } = await supabase
+          .from('prospect_replies')
+          .select('prospect_id')
+          .in('prospect_id', prospectIds);
+        
+        // Build map of prospect_id -> reply count
+        replyCounts?.forEach(reply => {
+          replyCountMap[reply.prospect_id] = (replyCountMap[reply.prospect_id] || 0) + 1;
+        });
+      }
+
+      // Transform prospects to match expected format
+      const enrichedProspects = dbProspects.map(prospect => ({
+        ...prospect,
+        linkedin: prospect.linkedin_profile,  // Map to expected field
+        linkedin_profile: prospect.linkedin_profile,  // Keep both
+        emailSent: prospect.status !== 'pending',  // Consider sent if not pending
+        replied: (replyCountMap[prospect.id] || 0) > 0,
+        followupCount: 0,  // Would need additional tracking table
+        id: prospect.id,  // Ensure ID is present
+        name: prospect.name,
+        email: prospect.email,
+        company: prospect.company,
+        role: prospect.role
+      }));
+
+      console.log(`[campaigns-v2] GET campaign ${campaignId}: Returning ${enrichedProspects.length} prospects`);
+
       return res.json({
         success: true,
-        campaign: dbCampaign
+        campaign: {
+          ...(dbCampaign || campaign.campaign || {}),
+          id: campaignId,
+          prospects: enrichedProspects,
+          prospectCount: enrichedProspects.length,
+          payload: {
+            leads: enrichedProspects  // Also include under payload.leads for compatibility
+          }
+        }
       });
     }
 
-    res.json(result);
+    // Fallback: return memory campaign if no database data found
+    if (campaign.success) {
+      res.json(campaign);
+    } else {
+      res.status(404).json({ 
+        success: false, 
+        error: 'Campaign not found',
+        campaignId 
+      });
+    }
   } catch (error) {
+    console.error('[campaigns-v2] GET campaign error:', error.message);
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /campaigns-v2/debug/db-status
+ * Diagnostic endpoint to check what's in Supabase
+ */
+router.get('/debug/db-status', async (req, res) => {
+  try {
+    // Get all campaigns from Supabase
+    const { data: campaigns, error: campaignError } = await supabase
+      .from('sutra_campaigns')
+      .select('id, name, domain, total_found')
+      .limit(5);
+
+    // Get all prospects from Supabase
+    const { data: prospects, error: prospectError } = await supabase
+      .from('prospects')
+      .select('id, campaign_id, name, email, company')
+      .limit(20);
+
+    // Group prospects by campaign
+    const prospectsByCampaign = {};
+    (prospects || []).forEach(p => {
+      if (!prospectsByCampaign[p.campaign_id]) {
+        prospectsByCampaign[p.campaign_id] = [];
+      }
+      prospectsByCampaign[p.campaign_id].push({ name: p.name, email: p.email });
+    });
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      supabase_campaigns: {
+        count: campaigns?.length || 0,
+        data: campaigns || []
+      },
+      supabase_prospects: {
+        count: prospects?.length || 0,
+        by_campaign: prospectsByCampaign
+      },
+      errors: {
+        campaignError: campaignError?.message,
+        prospectError: prospectError?.message
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Debug endpoint error',
+      message: error.message 
+    });
   }
 });
 
@@ -381,6 +538,26 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
         emailType: emailType,
         from: 'pavan@sutrahr.com'
       });
+
+      // ✅ Update prospect status in Supabase
+      try {
+        const { error: updateError } = await supabase
+          .from('prospects')
+          .update({ 
+            status: 'contacted',
+            updated_at: new Date().toISOString()
+          })
+          .eq('campaign_id', campaignId)
+          .eq('email', prospect.prospect.email);
+
+        if (updateError) {
+          console.error('[campaigns-v2] Error updating prospect status:', updateError.message);
+        } else {
+          console.log(`[campaigns-v2] ✅ Updated prospect status for ${prospect.prospect.email}`);
+        }
+      } catch (dbErr) {
+        console.error('[campaigns-v2] Exception updating prospect in Supabase:', dbErr.message);
+      }
 
       res.json({
         success: true,
@@ -1441,6 +1618,7 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
           const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
           const AI_MODEL = process.env.AI_MODEL || 'google/gemini-2.0-flash-001';
 
+          // AI classification: just classify intent, don't ask for reply body
           const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -1451,10 +1629,10 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
               model: AI_MODEL,
               messages: [{
                 role: 'user',
-                content: `Analyze this email reply and classify the intent. Return JSON with: intent (one of: positive, question, objection, not-interested, out-of-office), replySubject, replyBody (2-3 sentences).\n\nOriginal email subject: "${prospect.emailSubject || 'Outreach'}"\n\nTheir reply:\n${replyText}`
+                content: `Analyze this email reply and classify ONLY the intent. Return JSON with: intent (one of: positive, question, objection, not-interested, out-of-office). Nothing else.\n\nOriginal email subject: "${prospect.emailSubject || 'Outreach'}"\n\nTheir reply:\n${replyText}`
               }],
               temperature: 0.5,
-              max_tokens: 300,
+              max_tokens: 100,
             }),
           });
 
@@ -1466,25 +1644,32 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
             try {
               const parsed = JSON.parse(cleaned);
               intent = parsed.intent || 'question';
-              autoReplyBody = {
-                subject: parsed.replySubject || `Re: ${subjectHeader}`,
-                body: parsed.replyBody || 'Thanks for your reply!'
-              };
             } catch (parseErr) {
               console.error('[check-replies] AI parse error:', parseErr.message);
-              autoReplyBody = {
-                subject: `Re: ${subjectHeader}`,
-                body: `Hi ${prospect.name?.split(' ')[0] || prospect.name},\n\nThanks for getting back to me! Happy to discuss further.\n\nBest regards`
-              };
+              intent = 'question';
             }
           }
         } catch (aiErr) {
           console.error('[check-replies] AI classification error:', aiErr.message);
-          autoReplyBody = {
-            subject: `Re: ${subjectHeader}`,
-            body: `Hi ${prospect.name?.split(' ')[0] || prospect.name},\n\nThanks for your reply! Let's connect.\n\nBest regards`
-          };
+          intent = 'question';
           autoReplyError = aiErr.message;
+        }
+
+        // Generate category-wise reply based on detected intent
+        try {
+          autoReplyBody = generateCategoryWiseReply(
+            intent,
+            prospect.name,
+            prospect.company,
+            subjectHeader || 'Your Message'
+          );
+          console.log(`[check-replies] Generated ${intent} reply for ${fromEmail}`);
+        } catch (replyErr) {
+          console.error('[check-replies] Reply generation error:', replyErr.message);
+          autoReplyBody = {
+            subject: `Re: ${subjectHeader || 'Your Message'}`,
+            body: `Hi ${prospect.name?.split(' ')[0] || 'there'},\n\nThanks for your reply! Looking forward to connecting.\n\nBest regards`
+          };
         }
 
         // Send auto-reply via Gmail
