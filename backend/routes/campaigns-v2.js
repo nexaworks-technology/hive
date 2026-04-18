@@ -19,19 +19,27 @@ const router = express.Router();
  * Send email via Gmail API using user's connected Google account
  */
 async function sendGmailEmail({ to, subject, body, htmlBody, fromName, userId }) {
+  console.log(`[sendGmailEmail] 📧 Starting email send:`, { to, subject: subject?.slice(0, 30), userId });
+  
   if (!userId) {
+    console.error(`[sendGmailEmail] ❌ No userId provided`);
     throw new Error('User ID required to send email');
   }
 
+  console.log(`[sendGmailEmail] 🔑 Fetching Google tokens for userId: ${userId}`);
   const tokens = await getTokensForUser(userId);
   if (!tokens) {
+    console.error(`[sendGmailEmail] ❌ No Google tokens found for user ${userId}`);
     throw new Error('No Google tokens found for this user');
   }
 
+  console.log(`[sendGmailEmail] ✅ Found tokens, checking Gmail scope...`);
   if (!tokens.scope || !tokens.scope.includes('gmail.send')) {
-    throw new Error('Google account missing Gmail send permission');
+    console.error(`[sendGmailEmail] ❌ Missing gmail.send scope. Current scope:`, tokens.scope);
+    throw new Error('Google account missing Gmail send permission. Scope: ' + (tokens.scope || 'none'));
   }
 
+  console.log(`[sendGmailEmail] ✅ Scope verified, setting up Gmail API client...`);
   const { client } = await setCredentials(tokens, userId);
   const gmail = google.gmail({ version: 'v1', auth: client });
 
@@ -64,6 +72,7 @@ async function sendGmailEmail({ to, subject, body, htmlBody, fromName, userId })
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 
+  console.log(`[sendGmailEmail] 📤 Calling Gmail API to send message to ${to}...`);
   const result = await gmail.users.messages.send({
     userId: 'me',
     requestBody: { raw: encodedMessage }
@@ -638,10 +647,12 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
         messageId: emailResult.id
       });
     } catch (gmailError) {
-      console.error('[campaigns-v2] Gmail send error:', gmailError.message);
+      console.error('[campaigns-v2] ❌ Gmail send error:', gmailError.message);
+      console.error('[campaigns-v2] Error stack:', gmailError.stack?.split('\n').slice(0, 3).join(' | '));
       res.status(500).json({
         error: 'Failed to send email',
-        details: gmailError.message
+        details: gmailError.message,
+        errorType: gmailError.constructor.name
       });
     }
   } catch (error) {
