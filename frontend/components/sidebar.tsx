@@ -45,6 +45,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const [showGoogleAuth, setShowGoogleAuth] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState('');
   const [selectedSection, setSelectedSection] = useState('general');
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
@@ -118,6 +119,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     const fetchGoogleStatus = async () => {
       if (!session) {
         setGoogleConnected(false);
+        setGoogleEmail('');
         return;
       }
       try {
@@ -127,9 +129,11 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(payload?.error || 'Failed to check Google status');
         setGoogleConnected(Boolean(payload?.connected));
+        setGoogleEmail(payload?.email || 'hello@nexaworks.tech');
       } catch (error) {
         console.error('Failed to check Google status', error);
         setGoogleConnected(false);
+        setGoogleEmail('');
       }
     };
 
@@ -342,7 +346,30 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                     <DialogHeader>
                       <DialogTitle className="text-2xl mb-4">Account</DialogTitle>
                     </DialogHeader>
-                    <div className="text-muted-foreground">Account settings coming soon.</div>
+                    <div className="space-y-6">
+                      <div>
+                        <div className="text-base font-medium mb-3">Email Connection</div>
+                        <div className="p-4 border border-border rounded-lg bg-muted/30">
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-sm font-medium">Gmail/Google Workspace</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {googleConnected ? '✅ Connected' : '❌ Not connected'}
+                              </p>
+                            </div>
+                            {googleConnected && (
+                              <div className="pt-2 border-t border-border">
+                                <p className="text-xs text-muted-foreground mb-1">Connected Gmail:</p>
+                                <p className="text-sm font-medium">{googleEmail || 'hello@nexaworks.tech'}</p>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-4">
+                            Your Google account is connected to enable email sending and calendar integration.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </>
                 )}
                 {/* No Close button as requested */}
