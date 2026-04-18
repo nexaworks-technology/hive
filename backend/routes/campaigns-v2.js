@@ -494,28 +494,45 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
     const { prospectId, campaignId } = req.params;
     const { subject, body, htmlBody, emailType = 'initial' } = req.body;
 
+    console.log(`[campaigns-v2] 📧 send-email request:`, { prospectId, campaignId, subject: subject?.slice(0, 30) });
+
     if (!subject || !body) {
+      console.error(`[campaigns-v2] Missing fields - subject: ${!!subject}, body: ${!!body}`);
       return res.status(400).json({
         error: 'Missing required fields: subject, body'
       });
     }
 
     // Fetch prospect from Supabase instead of in-memory cache
+    console.log(`[campaigns-v2] Fetching prospect ${prospectId} from prospects table...`);
     const { data: prospectData, error: prospectError } = await supabase
       .from('prospects')
       .select('*')
       .eq('id', prospectId)
       .single();
 
-    if (prospectError || !prospectData) {
-      console.error(`[campaigns-v2] Prospect not found: ${prospectId}`, prospectError?.message);
+    if (prospectError) {
+      console.error(`[campaigns-v2] ❌ Prospect query error:`, prospectError);
       return res.status(404).json({
         success: false,
-        error: 'Prospect not found'
+        error: 'Prospect not found',
+        details: prospectError.message
       });
     }
 
+    if (!prospectData) {
+      console.error(`[campaigns-v2] ❌ Prospect not found: ${prospectId}`);
+      return res.status(404).json({
+        success: false,
+        error: 'Prospect not found',
+        prospectId
+      });
+    }
+
+    console.log(`[campaigns-v2] ✅ Found prospect: ${prospectData.name} (${prospectData.email})`);
+
     // Fetch campaign metadata from Supabase
+    console.log(`[campaigns-v2] Fetching campaign ${campaignId} from sutra_campaigns table...`);
     const { data: campaignData, error: campaignError } = await supabase
       .from('sutra_campaigns')
       .select('*')
@@ -523,12 +540,16 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
       .single();
 
     if (campaignError || !campaignData) {
-      console.error(`[campaigns-v2] Campaign not found: ${campaignId}`, campaignError?.message);
+      console.error(`[campaigns-v2] ❌ Campaign not found: ${campaignId}`, campaignError?.message);
       return res.status(404).json({
         success: false,
-        error: 'Campaign not found'
+        error: 'Campaign not found',
+        campaignId,
+        details: campaignError?.message
       });
     }
+
+    console.log(`[campaigns-v2] ✅ Found campaign: ${campaignData.domain}`);
 
     // Personalize email
     const personalizedBody = campaignManager.personalizeEmail(
@@ -542,6 +563,7 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
 
     // Send email via Gmail API using authenticated user's ID
     try {
+      console.log(`[campaigns-v2] 📧 Sending email to ${prospectData.email} via Gmail...`);
       const emailResult = await sendGmailEmail({
         to: prospectData.email,
         subject: subject,
