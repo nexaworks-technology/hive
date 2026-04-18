@@ -205,12 +205,20 @@ router.post('/create', async (req, res) => {
 
             const { data: inserted, error: insertError } = await supabase
               .from('prospects')
-              .insert(prospectRecords);
+              .insert(prospectRecords)
+              .select(); // IMPORTANT: Get back the inserted records with their auto-generated IDs
 
             if (insertError) {
               console.error(`[campaigns-v2] ❌ Error saving ${scrapedLeads.length} prospects to Supabase:`, insertError.message, insertError.details, insertError.hint);
             } else {
               console.log(`[campaigns-v2] ✅ Saved ${scrapedLeads.length} prospects to Supabase for campaign ${campaign.id}`);
+              if (inserted && inserted.length > 0) {
+                console.log(`[campaigns-v2] First prospect in DB:`, {
+                  id: inserted[0].id,
+                  name: inserted[0].name,
+                  email: inserted[0].email
+                });
+              }
             }
           } catch (dbErr) {
             console.error(`[campaigns-v2] ❌ Exception saving prospects to Supabase:`, dbErr.message);
@@ -332,6 +340,10 @@ router.get('/:campaignId', async (req, res) => {
       }));
 
       console.log(`[campaigns-v2] GET campaign ${campaignId}: Returning ${enrichedProspects.length} prospects`);
+      
+      if (enrichedProspects.length > 0) {
+        console.log(`[campaigns-v2] Sample prospect IDs being sent to frontend:`, enrichedProspects.slice(0, 2).map(p => ({ id: p.id, name: p.name, email: p.email })));
+      }
 
       return res.json({
         success: true,
