@@ -142,6 +142,49 @@ async function sendEmail({ to, subject, body, htmlBody, fromName, userId }) {
   });
 }
 
+/**
+ * Send a notification email to pavan@nexaworks.tech when a reply is received
+ */
+async function sendReplyNotification({ replies, campaignId, userId }) {
+  try {
+    if (!replies || replies.length === 0) return;
+
+    // Format reply details for the notification
+    const replyDetails = replies.map(reply => `
+Lead: ${reply.leadName} (${reply.leadEmail})
+Intent: ${reply.intent}
+Auto-reply sent: ${reply.autoReplySent ? 'Yes' : 'No'}
+Message preview: "${reply.replyText.slice(0, 100)}${reply.replyText.length > 100 ? '...' : ''}"
+────────────────────────────
+`).join('\n');
+
+    const subject = `[${replies.length} Reply${replies.length > 1 ? 's' : ''}] Campaign ${campaignId} - Action Required`;
+    const body = `Hi Pavan,
+
+You've received ${replies.length} new reply(ies) to your inbound campaign ${campaignId}:
+
+${replyDetails}
+
+Reply details have been saved to your campaign. Check your dashboard at https://hive.nexaworks.tech to review and create meetings.
+
+Best regards,
+Hive Team`;
+
+    await sendEmail({
+      to: 'pavan@nexaworks.tech',
+      subject,
+      body,
+      fromName: 'Hive Bot',
+      userId
+    });
+
+    console.log(`[inbound][notifications] Notification sent to pavan@nexaworks.tech for ${replies.length} reply(ies)`);
+  } catch (notifErr) {
+    console.error('[inbound][notifications] Failed to send notification:', notifErr.message);
+    // Don't throw - notification failure should not break reply processing
+  }
+}
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 /**
@@ -835,6 +878,15 @@ router.post('/:campaignId/check-replies', requireAuth, async (req, res) => {
 
     if (updateErr) {
       console.error('[inbound][check-replies] Supabase update error:', updateErr);
+    }
+
+    // Send notification to pavan@nexaworks.tech for new replies
+    if (newReplies.length > 0) {
+      await sendReplyNotification({
+        replies: newReplies,
+        campaignId,
+        userId: req.user.id
+      });
     }
   }
 

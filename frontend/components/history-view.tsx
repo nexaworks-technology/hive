@@ -115,13 +115,39 @@ export default function HistoryView() {
       <div className="space-y-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">{campaignTitle}</h1>
-          <p className="text-sm text-muted-foreground mt-2">{isLoadingRemote ? 'Loading stored campaigns...' : 'View all past leads and campaigns'}</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            {isLoadingRemote ? 'Loading campaign data...' : 'No campaign selected or no leads yet'}
+          </p>
         </div>
+
+        {activeCampaign && (
+          <Card className="p-6 border-border bg-card">
+            <h3 className="text-lg font-semibold text-foreground mb-6">Campaign Stats</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-muted/50 rounded-md">
+                <p className="text-sm text-muted-foreground">Total Leads</p>
+                <p className="text-2xl font-bold text-foreground">{activeCampaign.totalFound || activeCampaign.leadsScraped || 0}</p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-md">
+                <p className="text-sm text-muted-foreground">Emails Sent</p>
+                <p className="text-2xl font-bold text-foreground">{activeCampaign.totalEnrolled || activeCampaign.emailsSent || 0}</p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-md">
+                <p className="text-sm text-muted-foreground">Replies</p>
+                <p className="text-2xl font-bold text-foreground">{activeCampaign.repliesReceived || 0}</p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-md">
+                <p className="text-sm text-muted-foreground">Meetings</p>
+                <p className="text-2xl font-bold text-foreground">{activeCampaign.meetingsScheduled || 0}</p>
+              </div>
+            </div>
+          </Card>
+        )}
 
         <Card className="p-12 border-border bg-secondary text-center">
           <Clock className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
           <p className="text-muted-foreground">
-            {isLoadingRemote ? 'Loading stored campaigns...' : 'No leads history yet. Start a campaign to see results here.'}
+            {isLoadingRemote ? 'Loading stored campaigns...' : 'No leads in this campaign yet'}
           </p>
         </Card>
       </div>
@@ -134,6 +160,28 @@ export default function HistoryView() {
         <h1 className="text-3xl font-bold text-foreground">{campaignTitle}</h1>
         <p className="text-sm text-muted-foreground mt-2">{isLoadingRemote ? 'Loading campaign data...' : 'Follow-ups, replies, and meetings for this campaign'}</p>
       </div>
+
+      <Card className="p-6 border-border bg-card">
+        <h3 className="text-lg font-semibold text-foreground mb-6">Campaign Stats</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 bg-muted/50 rounded-md">
+            <p className="text-sm text-muted-foreground">Total Leads</p>
+            <p className="text-2xl font-bold text-foreground">{activeCampaign?.total_found || activeCampaign?.totalFound || activeCampaign?.leadsScraped || activeCampaign?.prospectCount || allLeads.length}</p>
+          </div>
+          <div className="p-4 bg-muted/50 rounded-md">
+            <p className="text-sm text-muted-foreground">Emails Sent</p>
+            <p className="text-2xl font-bold text-foreground">{activeCampaign?.total_enrolled || activeCampaign?.totalEnrolled || activeCampaign?.emailsSent || allLeads.filter(l => l.emailSent).length}</p>
+          </div>
+          <div className="p-4 bg-muted/50 rounded-md">
+            <p className="text-sm text-muted-foreground">Replies</p>
+            <p className="text-2xl font-bold text-foreground">{activeCampaign?.repliesReceived || allLeads.filter(l => l.replied).length}</p>
+          </div>
+          <div className="p-4 bg-muted/50 rounded-md">
+            <p className="text-sm text-muted-foreground">Meetings</p>
+            <p className="text-2xl font-bold text-foreground">{activeCampaign?.meetingsScheduled || allLeads.filter(l => l.meeting).length}</p>
+          </div>
+        </div>
+      </Card>
 
       <Card className="p-6 border-border bg-card">
           <h3 className="text-lg font-semibold text-foreground mb-4">All Leads ({allLeads.length})</h3>

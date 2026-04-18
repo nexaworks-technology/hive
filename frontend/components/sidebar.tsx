@@ -290,6 +290,9 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                     <span className="truncate font-semibold text-sm" title={campaign.domain || campaign.id}>
                       {campaign.domain || campaign.id}
                     </span>
+                    <span className="text-xs text-muted-foreground">
+                      {campaign.totalFound || campaign.leadsScraped || 0} leads · {campaign.totalEnrolled || campaign.emailsSent || 0} sent
+                    </span>
                   </div>
                 </Button>
               ))
