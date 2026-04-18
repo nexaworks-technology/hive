@@ -500,21 +500,41 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
       });
     }
 
-    const prospect = campaignManager.getProspectDetails(prospectId);
-    if (!prospect.success) {
-      return res.status(404).json(prospect);
+    // Fetch prospect from Supabase instead of in-memory cache
+    const { data: prospectData, error: prospectError } = await supabase
+      .from('prospects')
+      .select('*')
+      .eq('id', prospectId)
+      .single();
+
+    if (prospectError || !prospectData) {
+      console.error(`[campaigns-v2] Prospect not found: ${prospectId}`, prospectError?.message);
+      return res.status(404).json({
+        success: false,
+        error: 'Prospect not found'
+      });
     }
 
-    const campaign = campaignManager.getCampaign(campaignId);
-    if (!campaign.success) {
-      return res.status(404).json(campaign);
+    // Fetch campaign metadata from Supabase
+    const { data: campaignData, error: campaignError } = await supabase
+      .from('sutra_campaigns')
+      .select('*')
+      .eq('id', campaignId)
+      .single();
+
+    if (campaignError || !campaignData) {
+      console.error(`[campaigns-v2] Campaign not found: ${campaignId}`, campaignError?.message);
+      return res.status(404).json({
+        success: false,
+        error: 'Campaign not found'
+      });
     }
 
     // Personalize email
     const personalizedBody = campaignManager.personalizeEmail(
       body,
-      prospect.prospect,
-      { targetCompany: campaign.campaign.targetCompany }
+      prospectData,
+      { targetCompany: campaignData.domain || 'SutraHR' }
     );
 
     // If HTML body provided, use it (already has formatting); otherwise convert plain text to HTML
@@ -523,7 +543,7 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
     // Send email via Gmail API using authenticated user's ID
     try {
       const emailResult = await sendGmailEmail({
-        to: prospect.prospect.email,
+        to: prospectData.email,
         subject: subject,
         body: personalizedBody,
         htmlBody: finalHtmlBody,
@@ -548,12 +568,12 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
             updated_at: new Date().toISOString()
           })
           .eq('campaign_id', campaignId)
-          .eq('email', prospect.prospect.email);
+          .eq('email', prospectData.email);
 
         if (updateError) {
           console.error('[campaigns-v2] Error updating prospect status:', updateError.message);
         } else {
-          console.log(`[campaigns-v2] ✅ Updated prospect status for ${prospect.prospect.email}`);
+          console.log(`[campaigns-v2] ✅ Updated prospect status for ${prospectData.email}`);
         }
       } catch (dbErr) {
         console.error('[campaigns-v2] Exception updating prospect in Supabase:', dbErr.message);
@@ -580,19 +600,58 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
  * POST /campaigns/:campaignId/prospects/:prospectId/log-reply
  * Log a reply from prospect
  */
-router.post('/:campaignId/prospects/:prospectId/log-reply', (req, res) => {
+router.post('/:campaignId/prospects/:prospectId/log-reply', async (req, res) => {
   try {
-    const { prospectId } = req.params;
+    const { prospectId, campaignId } = req.params;
     const { from, subject, body, receivedAt } = req.body;
 
-    const result = campaignManager.logReply(prospectId, {
-      from: from,
-      subject: subject,
-      body: body,
-      receivedAt: receivedAt
-    });
+    // Verify prospect exists in Supabase
+    const { data: prospectData, error: prospectError } = await supabase
+      .from('prospects')
+      .select('id')
+      .eq('id', prospectId)
+      .single();
 
-    res.json(result);
+    if (prospectError || !prospectData) {
+      return res.status(404).json({ success: false, error: 'Prospect not found' });
+    }
+
+    // Store reply in Supabase prospect_replies table
+    try {
+      const { error: insertError } = await supabase
+        .from('prospect_replies')
+        .insert({
+          prospect_id: prospectId,
+          campaign_id: campaignId,
+          from: from,
+          subject: subject,
+          body: body,
+          received_at: receivedAt || new Date().toISOString(),
+          created_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error('[campaigns-v2] Error logging reply:', insertError.message);
+        return res.status(500).json({ success: false, error: insertError.message });
+      }
+
+      // Also log in campaign manager for backward compatibility
+      const result = campaignManager.logReply(prospectId, {
+        from: from,
+        subject: subject,
+        body: body,
+        receivedAt: receivedAt
+      });
+
+      res.json({
+        success: true,
+        message: 'Reply logged successfully',
+        ...result
+      });
+    } catch (dbErr) {
+      console.error('[campaigns-v2] Exception logging reply:', dbErr.message);
+      res.status(500).json({ success: false, error: dbErr.message });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -801,15 +860,27 @@ router.post('/:campaignId/prospects/:prospectId/send-auto-reply', requireAuth, a
  * POST /campaigns/:campaignId/prospects/:prospectId/schedule-followup
  * Schedule a follow-up
  */
-router.post('/:campaignId/prospects/:prospectId/schedule-followup', (req, res) => {
+router.post('/:campaignId/prospects/:prospectId/schedule-followup', async (req, res) => {
   try {
-    const { prospectId } = req.params;
+    const { prospectId, campaignId } = req.params;
     const { followUpDate, followUpType = 'email', followUpTemplate = '', notes = '' } = req.body;
 
     if (!followUpDate) {
       return res.status(400).json({ error: 'Missing required field: followUpDate' });
     }
 
+    // Verify prospect exists in Supabase
+    const { data: prospectData, error: prospectError } = await supabase
+      .from('prospects')
+      .select('id')
+      .eq('id', prospectId)
+      .single();
+
+    if (prospectError || !prospectData) {
+      return res.status(404).json({ success: false, error: 'Prospect not found' });
+    }
+
+    // Store follow-up in Supabase if we add a follow_ups table, for now just confirm via campaign manager
     const result = campaignManager.scheduleFollowUp(prospectId, {
       followUpDate: followUpDate,
       followUpType: followUpType,
