@@ -281,7 +281,7 @@ router.get('/:campaignId', async (req, res) => {
         .from('sutra_campaigns')
         .select('*')
         .eq('id', campaignId)
-        .single();
+        .maybeSingle();
       
       if (!campaignError && campaignData) {
         dbCampaign = campaignData;
@@ -545,23 +545,42 @@ router.post('/:campaignId/prospects/:prospectId/send-email', requireAuth, async 
 
     // Fetch campaign metadata from Supabase
     console.log(`[campaigns-v2] Fetching campaign ${campaignId} from sutra_campaigns table...`);
-    const { data: campaignData, error: campaignError } = await supabase
+    let { data: campaignData, error: campaignError } = await supabase
       .from('sutra_campaigns')
       .select('*')
       .eq('id', campaignId)
-      .single();
+      .maybeSingle();
 
-    if (campaignError || !campaignData) {
-      console.error(`[campaigns-v2] ❌ Campaign not found: ${campaignId}`, campaignError?.message);
-      return res.status(404).json({
+    if (campaignError) {
+      console.error(`[campaigns-v2] ❌ Campaign query error:`, campaignError.message);
+      return res.status(500).json({
         success: false,
-        error: 'Campaign not found',
-        campaignId,
-        details: campaignError?.message
+        error: 'Database error fetching campaign',
+        details: campaignError.message
       });
     }
 
-    console.log(`[campaigns-v2] ✅ Found campaign: ${campaignData.domain}`);
+    if (!campaignData) {
+      console.error(`[campaigns-v2] ❌ Campaign not found in sutra_campaigns: ${campaignId}`);
+      console.log(`[campaigns-v2] Trying fallback: from in-memory campaignManager...`);
+      
+      // Fallback to in-memory campaign manager if not in database yet
+      const memCampaign = campaignManager.getCampaign(campaignId);
+      if (!memCampaign.success) {
+        return res.status(404).json({
+          success: false,
+          error: 'Campaign not found',
+          campaignId,
+          note: 'Campaign may not be fully initialized yet. Try again in a moment.'
+        });
+      }
+      
+      // Use in-memory campaign data as fallback
+      campaignData = memCampaign.campaign;
+      console.log(`[campaigns-v2] ✅ Using in-memory campaign: ${campaignData.targetCompany}`);
+    } else {
+      console.log(`[campaigns-v2] ✅ Found campaign in DB: ${campaignData.domain}`);
+    }
 
     // Personalize email
     const personalizedBody = campaignManager.personalizeEmail(
