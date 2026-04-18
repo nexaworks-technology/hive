@@ -13,7 +13,6 @@ export interface Lead {
   title: string;
   company: string;
   email: string;
-  linkedin: string;
   emailSent: boolean;
   replied: boolean;
   followupCount: 0 | 1 | 2 | 3;

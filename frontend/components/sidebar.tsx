@@ -11,8 +11,6 @@ import { useSessionContext } from '@/components/auth-provider';
 import { supabase } from '@/lib/supabase-client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
-  SquarePen,
-  Search,
   PanelLeftClose,
   PanelRightClose,
   Settings,
@@ -27,7 +25,6 @@ import {
   SlidersHorizontal,
   Plus,
   Inbox,
-  Linkedin,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -194,34 +191,8 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           <LayoutDashboard className="w-8 h-8" />
           <span className={isOpen ? 'inline-flex' : 'hidden'}>Dashboard</span>
         </Button>
-        <Button
-          variant="ghost"
-          className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
-          onClick={() => {
-            if (!session) {
-              router.push(`/login?redirect=${encodeURIComponent('/')}`);
-              return;
-            }
-            if (googleConnected) {
-              setActiveTab('stage-1');
-              router.push('/');
-            } else {
-              setShowGoogleAuth(true);
-            }
-          }}
-        >
-          <SquarePen className="w-8 h-8" />
-          <span className={isOpen ? 'inline-flex' : 'hidden'}>New Campaign</span>
-        </Button>
+
         <div className="mt-0">
-          <Button
-            variant="ghost"
-            className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
-            onClick={() => setActiveTab('history')}
-          >
-            <Search className="w-8 h-8" />
-            <span className={isOpen ? 'inline-flex' : 'hidden'}>Search Campaign</span>
-          </Button>
           {/* Company/My Profile shortcut */}
           <div className={isOpen ? 'my-2' : 'my-2'}>
             <div className="border-t border-sidebar-border" />
@@ -248,17 +219,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <Inbox className="w-8 h-8" />
             <span className={isOpen ? 'inline-flex' : 'hidden'}>Inbound</span>
           </Button>
-          <Button
-            variant="ghost"
-            className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-[#0a66c2] dark:text-[#70b5f9] hover:bg-[#0a66c2]/10 dark:hover:bg-[#70b5f9]/10 hover:text-[#0a66c2] dark:hover:text-[#70b5f9] transition-shadow`}
-            onClick={() => {
-              setActiveTab('linkedin');
-              router.push('/linkedin');
-            }}
-          >
-            <Linkedin className="w-8 h-8" />
-            <span className={isOpen ? 'inline-flex font-semibold' : 'hidden'}>LinkedIn</span>
-          </Button>
+
           <div className={`${isOpen ? 'flex' : 'hidden'} items-center gap-2 text-base text-[#AFAFAF] mt-2 pl-2`}>
             <span>campaigns</span>
             <ChevronRight className="w-5 h-5" />
