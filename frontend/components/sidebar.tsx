@@ -197,18 +197,6 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         </Button>
 
         <div className="mt-0">
-          {/* Company/My Profile shortcut */}
-          <div className={isOpen ? 'my-2' : 'my-2'}>
-            <div className="border-t border-sidebar-border" />
-          </div>
-          <Button
-            variant="ghost"
-            className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
-            onClick={() => router.push('/profile')}
-          >
-            <Settings className="w-8 h-8" />
-            <span className={isOpen ? 'inline-flex' : 'hidden'}>Company/My Profile</span>
-          </Button>
           <Button
             variant="ghost"
             className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
