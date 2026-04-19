@@ -184,7 +184,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         </Button>
       </div>
 
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-4 flex-shrink-0">
         <Button
           variant="ghost"
           className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
@@ -197,7 +197,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           <span className={isOpen ? 'inline-flex' : 'hidden'}>Dashboard</span>
         </Button>
 
-        <div className="mt-0">
+        <div className="mt-0 flex flex-col flex-shrink-0">
           <Button
             variant="ghost"
             className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
@@ -217,7 +217,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <span>campaigns</span>
             <ChevronRight className="w-5 h-5" />
           </div>
-          <div className={`${isOpen ? 'mt-2 max-h-[200px] overflow-y-auto space-y-1 pr-1' : 'hidden'}`}>
+          <div className={`${isOpen ? 'mt-2 max-h-[150px] overflow-y-auto space-y-1 pr-1 flex-shrink' : 'hidden'}`}>
             {isLoadingCampaigns ? (
               <div className="space-y-1 pr-1" aria-label="Loading campaigns">
                 {[0, 1, 2].map((i) => (
