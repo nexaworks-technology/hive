@@ -158,13 +158,11 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             alt="Hive logo"
             className={`flex-shrink-0 dark:invert dark:brightness-0 ${!isOpen && isHovering ? 'hidden' : 'h-8 w-8'}`}
           />
-          <div className={`relative flex flex-col transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 w-0'}`}>
+          <div className={`flex flex-col transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 w-0'}`}>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Beta</span>
             <div className="text-2xl font-bold text-primary">
               Hive
             </div>
-            <span className="absolute -top-1 -right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground uppercase tracking-widest shadow-sm">
-              Beta
-            </span>
           </div>
         </div>
         <Button
@@ -219,7 +217,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <span>campaigns</span>
             <ChevronRight className="w-5 h-5" />
           </div>
-          <div className={`${isOpen ? 'mt-2 max-h-[70vh] overflow-y-auto space-y-1 pr-1' : 'hidden'}`}>
+          <div className={`${isOpen ? 'mt-2 max-h-[200px] overflow-y-auto space-y-1 pr-1' : 'hidden'}`}>
             {isLoadingCampaigns ? (
               <div className="space-y-1 pr-1" aria-label="Loading campaigns">
                 {[0, 1, 2].map((i) => (
