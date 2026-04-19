@@ -158,10 +158,11 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             alt="Hive logo"
             className={`flex-shrink-0 dark:invert dark:brightness-0 ${!isOpen && isHovering ? 'hidden' : 'h-8 w-8'}`}
           />
-          <div
-            className={`text-2xl font-bold text-primary transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 w-0'}`}
-          >
-            Hive
+          <div className={`flex flex-col transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 w-0'}`}>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Beta</span>
+            <div className="text-2xl font-bold text-primary">
+              Hive
+            </div>
           </div>
         </div>
         <Button
