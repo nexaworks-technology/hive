@@ -664,15 +664,6 @@ function ReviewLeadsStep({
   return (
     <>
       <div className="space-y-5">
-        <Button
-          variant="ghost"
-          onClick={() => router.push('/dashboard')}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Dashboard
-        </Button>
-        
         <div className="text-center space-y-2">
           <div className="mx-auto w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mb-4"><Users className="w-7 h-7 text-primary" /></div>
           <h1 className="text-4xl font-bold tracking-tight">Review Your Leads</h1>
@@ -813,6 +804,16 @@ export default function InboundPage() {
 
   return (
     <div className="flex-1 min-h-screen bg-background text-foreground flex flex-col items-center py-10 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-3xl">
+        <Button
+          variant="ghost"
+          onClick={() => router.push('/dashboard')}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Dashboard
+        </Button>
+      </div>
       <div className="w-full max-w-3xl space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <StepIndicator currentStep={step} />
         {step === 'upload' && <UploadStep onParsed={handleParsed} />}
