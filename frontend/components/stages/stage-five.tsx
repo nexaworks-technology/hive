@@ -170,9 +170,13 @@ Appreciate the quick response. I’ll pause outreach for now. If priorities chan
 
   const handleSendReply = async (lead: Lead, sentiment: ReplySentiment) => {
     if (replySendingId) return;
+    
+    console.log('🔵 [REPLY DEBUG] Starting handleSendReply for lead:', lead.email);
     setReplySendingId(lead.id);
 
     const draft = buildReplyDraft(lead, sentiment);
+    console.log('📝 [REPLY DEBUG] Draft created:', { subject: draft.subject, body: draft.body });
+    
     const loadingToastId = toastManager.notify({
       title: 'Sending reply...',
       message: `Delivering to ${lead.email}`,
@@ -181,22 +185,32 @@ Appreciate the quick response. I’ll pause outreach for now. If priorities chan
     });
 
     try {
+      const requestPayload = {
+        to: lead.email,
+        subject: draft.subject,
+        body: draft.body,
+        fromName: 'Nexaworks',
+      };
+      
+      console.log('📤 [REPLY DEBUG] Sending request to /api/send-email:', requestPayload);
+      
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: lead.email,
-          subject: draft.subject,
-          body: draft.body,
-          fromName: 'Nexaworks',
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
+      console.log('📥 [REPLY DEBUG] Response status:', res.status, res.statusText);
+      
       if (!res.ok) {
         const details = await res.json().catch(() => ({} as any));
+        console.error('❌ [REPLY DEBUG] Failed response:', details);
         const parts = [details.error || 'Failed to send reply'];
         throw new Error(parts.join(' | '));
       }
+
+      const response = await res.json();
+      console.log('✅ [REPLY DEBUG] Email sent successfully:', response);
 
       const updatedLeads = workflowState?.leads.map((l) =>
         l.id === lead.id
@@ -219,6 +233,7 @@ Appreciate the quick response. I’ll pause outreach for now. If priorities chan
       ];
 
       workflowManager.setState({ leads: updatedLeads, sentEmails: updatedSent });
+      console.log('💾 [REPLY DEBUG] State updated with new lead and email records');
 
       toastManager.notify({
         title: 'Reply sent',
@@ -226,6 +241,7 @@ Appreciate the quick response. I’ll pause outreach for now. If priorities chan
         type: 'success',
       });
     } catch (err) {
+      console.error('❌ [REPLY DEBUG] Error during reply send:', err);
       toastManager.notify({
         title: 'Reply failed',
         message: (err as Error).message || 'Unexpected error',
