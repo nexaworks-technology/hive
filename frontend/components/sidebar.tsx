@@ -10,6 +10,7 @@ import { workflowManager, type WorkflowState } from '@/lib/workflow-context';
 import { useSessionContext } from '@/components/auth-provider';
 import { supabase } from '@/lib/supabase-client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EmailSettingsSection } from '@/components/email-settings';
 import {
   PanelLeftClose,
   PanelRightClose,
@@ -306,20 +307,9 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 {selectedSection === 'edit-email' && (
                   <>
                     <DialogHeader>
-                      <DialogTitle className="text-2xl mb-4">Edit Email</DialogTitle>
+                      <DialogTitle className="text-2xl mb-4">Email Accounts</DialogTitle>
                     </DialogHeader>
-                    <div className="flex flex-col gap-4">
-                      <button
-                        className="px-5 py-2 bg-primary text-white rounded-md font-semibold w-fit hover:bg-primary/90 transition-colors flex items-center gap-2"
-                        type="button"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Email
-                      </button>
-                      <div className="text-muted-foreground text-base max-w-md">
-                        Integrate your email to send mails to leads
-                      </div>
-                    </div>
+                    <EmailSettingsSection session={session} />
                   </>
                 )}
                 {selectedSection === 'calendar' && (
