@@ -160,32 +160,71 @@ export const testIMAPConnection = async (emailAccount) => {
       host: imap_host,
       port: imap_port,
       tls: imap_port === 993,
-      connTimeout: 10000,
-      authTimeout: 10000,
+      tlsOptions: { rejectUnauthorized: false },
+      connTimeout: 15000,
+      authTimeout: 15000,
     });
 
     let resolved = false;
 
-    imap.openBox('INBOX', false, (err, box) => {
+    const cleanup = () => {
+      try {
+        imap.end();
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    // Handle connection ready
+    imap.on('ready', () => {
       if (resolved) return;
       resolved = true;
-      imap.end();
-      if (err) {
-        return reject(err);
-      }
+      console.log('✅ IMAP connection successful');
+      cleanup();
       resolve({ success: true, message: 'IMAP connection successful' });
     });
 
+    // Handle errors
     imap.on('error', (err) => {
       if (!resolved) {
         resolved = true;
-        reject(err);
+        console.error('❌ IMAP connection error:', err.message);
+        cleanup();
+        reject(new Error(`IMAP connection failed: ${err.message}`));
       }
     });
 
-    imap.on('ready', () => {
-      // Connection is ready, openBox will be called next
+    // Handle close
+    imap.on('close', () => {
+      if (!resolved) {
+        resolved = true;
+        console.error('❌ IMAP connection closed unexpectedly');
+        reject(new Error('IMAP connection closed unexpectedly'));
+      }
     });
+
+    // Add timeout
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        console.error('❌ IMAP connection timeout');
+        cleanup();
+        reject(new Error('IMAP connection timeout'));
+      }
+    }, 20000);
+
+    // Initiate connection
+    console.log('📧 Testing IMAP connection to', imap_host);
+    try {
+      imap.openBox('INBOX', false);
+    } catch (err) {
+      clearTimeout(timeout);
+      if (!resolved) {
+        resolved = true;
+        console.error('❌ Failed to initiate IMAP:', err.message);
+        reject(new Error(`Failed to initiate IMAP: ${err.message}`));
+      }
+    }
   });
 };
 
