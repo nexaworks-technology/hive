@@ -160,18 +160,32 @@ export const testIMAPConnection = async (emailAccount) => {
       host: imap_host,
       port: imap_port,
       tls: imap_port === 993,
+      connTimeout: 10000,
+      authTimeout: 10000,
     });
 
+    let resolved = false;
+
     imap.openBox('INBOX', false, (err, box) => {
+      if (resolved) return;
+      resolved = true;
+      imap.end();
       if (err) {
-        imap.end();
         return reject(err);
       }
-      imap.end();
       resolve({ success: true, message: 'IMAP connection successful' });
     });
 
-    imap.on('error', reject);
+    imap.on('error', (err) => {
+      if (!resolved) {
+        resolved = true;
+        reject(err);
+      }
+    });
+
+    imap.on('ready', () => {
+      // Connection is ready, openBox will be called next
+    });
   });
 };
 
