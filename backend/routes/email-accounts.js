@@ -134,6 +134,71 @@ router.post('/', async (req, res) => {
 });
 
 /**
+ * POST /email-accounts/test-form
+ * Test connection for form data (before saving)
+ */
+router.post('/test-form', async (req, res) => {
+  try {
+    const {
+      email_address,
+      imap_host,
+      imap_port = 993,
+      imap_password,
+      smtp_host,
+      smtp_port = 587,
+      smtp_password,
+    } = req.body;
+
+    // Validate inputs
+    if (!email_address || !imap_host || !imap_password || !smtp_host || !smtp_password) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const results = {
+      imap: { success: false, error: null },
+      smtp: { success: false, error: null },
+    };
+
+    // Test IMAP
+    try {
+      const testAccount = {
+        email_address,
+        imap_host,
+        imap_port,
+        imap_encrypted_password: encryptCredential(imap_password),
+      };
+      await testIMAPConnection(testAccount);
+      results.imap.success = true;
+      console.log('✅ IMAP test passed for', email_address);
+    } catch (imapError) {
+      results.imap.error = imapError.message;
+      console.error('❌ IMAP test failed:', imapError.message);
+    }
+
+    // Test SMTP
+    try {
+      const testAccount = {
+        email_address,
+        smtp_host,
+        smtp_port,
+        smtp_encrypted_password: encryptCredential(smtp_password),
+      };
+      await testSMTPConnection(testAccount);
+      results.smtp.success = true;
+      console.log('✅ SMTP test passed for', email_address);
+    } catch (smtpError) {
+      results.smtp.error = smtpError.message;
+      console.error('❌ SMTP test failed:', smtpError.message);
+    }
+
+    return res.json({ results });
+  } catch (err) {
+    console.error('[email-accounts test-form] error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /email-accounts/:id/test
  * Test connection for an email account
  */

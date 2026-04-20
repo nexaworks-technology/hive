@@ -15,6 +15,8 @@ export function EmailSettingsSection({ session }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [testingId, setTestingId] = useState(null);
+  const [testingForm, setTestingForm] = useState(false);
+  const [testResults, setTestResults] = useState(null);
 
   const [formData, setFormData] = useState({
     email_address: '',
@@ -88,6 +90,7 @@ export function EmailSettingsSection({ session }) {
         smtp_password: '',
       });
       setShowAddForm(false);
+      setTestResults(null);
       await fetchEmailAccounts();
     } catch (err) {
       console.error('Error adding account:', err);
@@ -98,6 +101,61 @@ export function EmailSettingsSection({ session }) {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTestFormConnection = async () => {
+    if (!formData.email_address || !formData.imap_host || !formData.imap_password || !formData.smtp_host || !formData.smtp_password) {
+      toastManager.notify({
+        title: 'Missing fields',
+        message: 'Please fill in all email and password fields',
+        type: 'error',
+      });
+      return;
+    }
+
+    setTestingForm(true);
+
+    try {
+      console.log('🧪 Testing email connection...');
+      const res = await fetch(`${apiBaseUrl}/email-accounts/test-form`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Test failed');
+      }
+
+      setTestResults(data.results);
+
+      const imapStatus = data.results.imap.success ? '✅ IMAP Connected' : `❌ IMAP Failed: ${data.results.imap.error}`;
+      const smtpStatus = data.results.smtp.success ? '✅ SMTP Connected' : `❌ SMTP Failed: ${data.results.smtp.error}`;
+
+      toastManager.notify({
+        title: 'Test Results',
+        message: `${imapStatus} | ${smtpStatus}`,
+        type: data.results.imap.success && data.results.smtp.success ? 'success' : 'error',
+      });
+    } catch (err) {
+      console.error('Error testing connection:', err);
+      toastManager.notify({
+        title: 'Connection test failed',
+        message: err.message,
+        type: 'error',
+      });
+      setTestResults({
+        imap: { success: false, error: err.message },
+        smtp: { success: false, error: err.message }
+      });
+    } finally {
+      setTestingForm(false);
     }
   };
 
@@ -404,8 +462,23 @@ export function EmailSettingsSection({ session }) {
 
             <div className="flex gap-3 pt-4">
               <Button
+                type="button"
+                variant="outline"
+                onClick={handleTestFormConnection}
+                disabled={testingForm || isLoading}
+                className="gap-2"
+              >
+                {testingForm ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+                Test Connection
+              </Button>
+
+              <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || testingForm}
                 className="flex-1 gap-2"
               >
                 {isLoading ? (
@@ -418,12 +491,43 @@ export function EmailSettingsSection({ session }) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowAddForm(false)}
-                disabled={isLoading}
+                onClick={() => {
+                  setShowAddForm(false);
+                  setTestResults(null);
+                }}
+                disabled={isLoading || testingForm}
               >
                 Cancel
               </Button>
             </div>
+
+            {testResults && (
+              <div className="mt-4 p-3 rounded-lg border">
+                <p className="text-sm font-semibold mb-2">Test Results:</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    {testResults.imap.success ? (
+                      <Check className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <X className="w-4 h-4 text-red-600" />
+                    )}
+                    <span>
+                      IMAP: {testResults.imap.success ? 'Connected' : testResults.imap.error}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {testResults.smtp.success ? (
+                      <Check className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <X className="w-4 h-4 text-red-600" />
+                    )}
+                    <span>
+                      SMTP: {testResults.smtp.success ? 'Connected' : testResults.smtp.error}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </form>
         </Card>
       )}
