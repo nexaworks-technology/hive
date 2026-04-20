@@ -167,39 +167,26 @@ export const testIMAPConnection = async (emailAccount) => {
 
     let resolved = false;
 
-    const cleanup = () => {
-      try {
-        imap.end();
-      } catch (e) {
-        // ignore
-      }
-    };
-
-    // Handle connection ready
-    imap.on('ready', () => {
+    imap.openBox('INBOX', false, (err, box) => {
       if (resolved) return;
       resolved = true;
+
+      if (err) {
+        console.error('❌ IMAP test failed:', err.message);
+        imap.end();
+        return reject(new Error(`IMAP connection failed: ${err.message}`));
+      }
+
       console.log('✅ IMAP connection successful');
-      cleanup();
+      imap.end();
       resolve({ success: true, message: 'IMAP connection successful' });
     });
 
-    // Handle errors
     imap.on('error', (err) => {
       if (!resolved) {
         resolved = true;
-        console.error('❌ IMAP connection error:', err.message);
-        cleanup();
+        console.error('❌ IMAP error:', err.message);
         reject(new Error(`IMAP connection failed: ${err.message}`));
-      }
-    });
-
-    // Handle close
-    imap.on('close', () => {
-      if (!resolved) {
-        resolved = true;
-        console.error('❌ IMAP connection closed unexpectedly');
-        reject(new Error('IMAP connection closed unexpectedly'));
       }
     });
 
@@ -208,23 +195,10 @@ export const testIMAPConnection = async (emailAccount) => {
       if (!resolved) {
         resolved = true;
         console.error('❌ IMAP connection timeout');
-        cleanup();
+        imap.end();
         reject(new Error('IMAP connection timeout'));
       }
     }, 20000);
-
-    // Initiate connection
-    console.log('📧 Testing IMAP connection to', imap_host);
-    try {
-      imap.openBox('INBOX', false);
-    } catch (err) {
-      clearTimeout(timeout);
-      if (!resolved) {
-        resolved = true;
-        console.error('❌ Failed to initiate IMAP:', err.message);
-        reject(new Error(`Failed to initiate IMAP: ${err.message}`));
-      }
-    }
   });
 };
 
