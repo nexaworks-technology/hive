@@ -13,6 +13,7 @@
     "express": "^4.18.3",
     "googleapis": "^140.0.1",
     "imap": "^0.8.19",
+    "imap-simple": "^5.1.0",
     "imapflow": "^1.2.16",
     "mailparser": "^3.9.4",
     "node-cron": "^3.0.3",

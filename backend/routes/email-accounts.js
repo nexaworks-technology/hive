@@ -2,7 +2,7 @@ import express from 'express';
 import { supabase } from '../supabase-client.js';
 import requireAuth from '../middleware/require-auth.js';
 import { encryptCredential, decryptCredential } from '../utils/encryption.js';
-import { testIMAPConnection, testSMTPConnection, syncEmailsForAccount } from '../services/email-service.js';
+import { testIMAPConnection, testSMTPConnection, syncEmailsForAccount, sendEmailViaSMTP } from '../services/email-service.js';
 
 const router = express.Router();
 
@@ -68,6 +68,60 @@ router.post('/test-form', async (req, res) => {
     return res.json({ results });
   } catch (err) {
     console.error('[email-accounts test-form] error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /email-accounts/send-test
+ * Send a test email (no auth required)
+ * Used for quick testing with unverified accounts
+ */
+router.post('/send-test', async (req, res) => {
+  try {
+    const {
+      email_address,
+      smtp_host,
+      smtp_port = 587,
+      smtp_password,
+      to,
+      subject = 'Test Email from Hive',
+      text = 'This is a test email sent from Hive email integration.',
+    } = req.body;
+
+    // Validate inputs
+    if (!email_address || !smtp_host || !smtp_password || !to) {
+      return res.status(400).json({ error: 'Missing required fields: email_address, smtp_host, smtp_password, to' });
+    }
+
+    try {
+      const testAccount = {
+        email_address,
+        smtp_host,
+        smtp_port,
+        smtp_encrypted_password: encryptCredential(smtp_password),
+      };
+
+      const result = await sendEmailViaSMTP(testAccount, { to, subject, text });
+      console.log('✅ Test email sent successfully:', result.messageId);
+
+      return res.json({
+        success: true,
+        messageId: result.messageId,
+        from: email_address,
+        to,
+        message: 'Test email sent successfully',
+      });
+    } catch (sendError) {
+      console.error('❌ Failed to send test email:', sendError.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to send test email',
+        details: sendError.message,
+      });
+    }
+  } catch (err) {
+    console.error('[email-accounts send-test] error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -269,6 +323,55 @@ router.post('/:id/sync', async (req, res) => {
     return res.json({ message: 'Sync initiated', status: 'queued' });
   } catch (err) {
     console.error('[email-accounts sync] error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /email-accounts/:id/send
+ * Send an email from a connected email account
+ */
+router.post('/:id/send', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { to, subject, text, html } = req.body;
+
+    // Validate inputs
+    if (!to || !subject || !text) {
+      return res.status(400).json({ error: 'Missing to, subject, or text' });
+    }
+
+    // Fetch email account
+    const { data: emailAccount, error: fetchError } = await supabase
+      .from('email_accounts')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (fetchError || !emailAccount) {
+      return res.status(404).json({ error: 'Email account not found' });
+    }
+
+    // Send email
+    try {
+      const result = await sendEmailViaSMTP(emailAccount, { to, subject, text, html });
+      console.log('✅ Email sent successfully:', result.messageId);
+      return res.json({
+        success: true,
+        messageId: result.messageId,
+        from: emailAccount.email_address,
+        to,
+      });
+    } catch (sendError) {
+      console.error('❌ Failed to send email:', sendError.message);
+      return res.status(500).json({
+        error: 'Failed to send email',
+        details: sendError.message,
+      });
+    }
+  } catch (err) {
+    console.error('[email-accounts send] error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

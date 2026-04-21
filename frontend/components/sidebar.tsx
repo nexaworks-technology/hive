@@ -272,7 +272,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 <div className="text-lg font-semibold mb-4">Settings</div>
                 {[
                   { key: 'general', label: 'General', icon: <SlidersHorizontal className="w-5 h-5 mr-2 inline" /> },
-                  { key: 'edit-email', label: 'Edit Email', icon: <Mail className="w-5 h-5 mr-2 inline" /> },
+                  { key: 'edit-email', label: 'Email Accounts', icon: <Mail className="w-5 h-5 mr-2 inline" /> },
                   { key: 'calendar', label: 'Calendar', icon: <Calendar className="w-5 h-5 mr-2 inline" /> },
                   { key: 'account', label: 'Account', icon: <User className="w-5 h-5 mr-2 inline" /> },
                 ].map((s) => (

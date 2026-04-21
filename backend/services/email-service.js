@@ -1,100 +1,93 @@
 import Imap from 'imap';
 import { simpleParser } from 'mailparser';
 import nodemailer from 'nodemailer';
+import ImapSimple from 'imap-simple';
 import { supabase } from '../supabase-client.js';
 import { decryptCredential } from '../utils/encryption.js';
 
 /**
- * Fetch emails from IMAP server
+ * Fetch emails from IMAP server using imap-simple
  */
 export const fetchEmailsFromIMAP = async (emailAccount) => {
-  return new Promise((resolve, reject) => {
-    const { imap_host, imap_port, email_address, imap_encrypted_password } = emailAccount;
-    
-    let decryptedPassword;
-    try {
-      decryptedPassword = decryptCredential(imap_encrypted_password);
-    } catch (err) {
-      console.error('Failed to decrypt IMAP password:', err);
-      return reject(new Error('Failed to decrypt credentials'));
+  const { imap_host, imap_port, email_address, imap_encrypted_password } = emailAccount;
+  
+  let decryptedPassword;
+  try {
+    decryptedPassword = decryptCredential(imap_encrypted_password);
+  } catch (err) {
+    console.error('Failed to decrypt IMAP password:', err);
+    throw new Error('Failed to decrypt credentials');
+  }
+
+  let connection;
+  const emails = [];
+
+  try {
+    // Connect to IMAP server
+    connection = await ImapSimple.connect({
+      imap: {
+        user: email_address,
+        password: decryptedPassword,
+        host: imap_host,
+        port: imap_port,
+        tls: imap_port === 993,
+        tlsOptions: { rejectUnauthorized: false },
+        connTimeout: 15000,
+        authTimeout: 15000,
+      },
+    });
+
+    // Open INBOX
+    await connection.openBox('INBOX');
+
+    // Search for unread emails
+    const searchResults = await connection.search(['UNSEEN']);
+
+    if (searchResults.length === 0) {
+      console.log('No new emails found');
+      return emails;
     }
 
-    const imap = new Imap({
-      user: email_address,
-      password: decryptedPassword,
-      host: imap_host,
-      port: imap_port,
-      tls: imap_port === 993,
-    });
+    // Fetch the emails
+    const messages = await connection.fetch(searchResults, { bodies: '' });
 
-    const emails = [];
-
-    imap.openBox('INBOX', false, async (err, box) => {
-      if (err) {
-        console.error('Failed to open INBOX:', err);
-        imap.end();
-        return reject(err);
-      }
-
-      // Fetch last 50 unread emails (or since last sync)
-      const searchCriteria = ['UNSEEN'];
-      imap.search(searchCriteria, (err, results) => {
-        if (err || !results || results.length === 0) {
-          imap.end();
-          return resolve(emails);
-        }
-
-        const f = imap.fetch(results, { bodies: '' });
+    // Parse each message
+    for (const message of messages) {
+      try {
+        const parsed = await simpleParser(message.parts[0].which(''), {});
         
-        f.on('message', (msg, seqno) => {
-          simpleParser(msg, async (err, parsed) => {
-            if (err) {
-              console.error('Error parsing email:', err);
-              return;
-            }
-
-            try {
-              emails.push({
-                messageId: parsed.messageId || `${Date.now()}-${seqno}`,
-                inReplyTo: parsed.inReplyTo,
-                subject: parsed.subject || '(no subject)',
-                from: parsed.from?.text || 'unknown@unknown.com',
-                fromName: parsed.from?.name,
-                to: parsed.to?.text || email_address,
-                text: parsed.text || '',
-                html: parsed.html,
-                date: parsed.date,
-                threadId: parsed.headers?.get('x-thread-id') || parsed.messageId,
-              });
-            } catch (error) {
-              console.error('Error processing parsed email:', error);
-            }
-          });
+        emails.push({
+          messageId: parsed.messageId || `${Date.now()}-${message.attributes.uid}`,
+          inReplyTo: parsed.inReplyTo,
+          subject: parsed.subject || '(no subject)',
+          from: parsed.from?.text || 'unknown@unknown.com',
+          fromName: parsed.from?.name,
+          to: parsed.to?.text || email_address,
+          text: parsed.text || '',
+          html: parsed.html,
+          date: parsed.date,
+          threadId: parsed.headers?.get('x-thread-id') || parsed.messageId,
         });
+      } catch (error) {
+        console.error('Error parsing email:', error);
+      }
+    }
 
-        f.on('error', (err) => {
-          console.error('Fetch error:', err);
-          imap.end();
-          reject(err);
-        });
-
-        f.on('end', () => {
-          imap.end();
-        });
-      });
-    });
-
-    imap.on('error', (err) => {
-      console.error('IMAP error:', err);
-      reject(err);
-    });
-
-    imap.on('end', () => {
-      resolve(emails);
-    });
-
-    imap.openBox('INBOX', false);
-  });
+    console.log(`✅ Fetched ${emails.length} emails from IMAP`);
+    return emails;
+  } catch (error) {
+    console.error('❌ Error fetching emails from IMAP:', error);
+    throw error;
+  } finally {
+    // Close connection
+    if (connection) {
+      try {
+        await connection.end();
+      } catch (e) {
+        console.error('Error closing IMAP connection:', e);
+      }
+    }
+  }
 };
 
 /**
@@ -141,74 +134,39 @@ export const sendEmailViaSMTP = async (emailAccount, options) => {
 };
 
 /**
- * Test IMAP connection
+ * Test IMAP connection using imap-simple
  */
 export const testIMAPConnection = async (emailAccount) => {
-  return new Promise((resolve, reject) => {
-    const { imap_host, imap_port, email_address, imap_encrypted_password } = emailAccount;
+  const { imap_host, imap_port, email_address, imap_encrypted_password } = emailAccount;
 
-    let decryptedPassword;
-    try {
-      decryptedPassword = decryptCredential(imap_encrypted_password);
-    } catch (err) {
-      return reject(new Error('Failed to decrypt credentials'));
-    }
+  let decryptedPassword;
+  try {
+    decryptedPassword = decryptCredential(imap_encrypted_password);
+  } catch (err) {
+    throw new Error('Failed to decrypt credentials');
+  }
 
-    const imap = new Imap({
-      user: email_address,
-      password: decryptedPassword,
-      host: imap_host,
-      port: imap_port,
-      tls: imap_port === 993,
-      tlsOptions: { rejectUnauthorized: false },
-      connTimeout: 15000,
-      authTimeout: 15000,
+  try {
+    const connection = await ImapSimple.connect({
+      imap: {
+        user: email_address,
+        password: decryptedPassword,
+        host: imap_host,
+        port: imap_port,
+        tls: imap_port === 993,
+        tlsOptions: { rejectUnauthorized: false },
+        connTimeout: 15000,
+        authTimeout: 15000,
+      },
     });
 
-    let resolved = false;
-
-    // Handle ready event - connection is authenticated
-    imap.on('ready', () => {
-      if (resolved) return;
-      resolved = true;
-      console.log('✅ IMAP connection successful');
-      imap.end();
-      resolve({ success: true, message: 'IMAP connection successful' });
-    });
-
-    // Handle errors
-    imap.on('error', (err) => {
-      if (!resolved) {
-        resolved = true;
-        console.error('❌ IMAP test failed:', err.message);
-        reject(new Error(`IMAP connection failed: ${err.message}`));
-      }
-    });
-
-    // Handle close
-    imap.on('close', () => {
-      if (!resolved) {
-        resolved = true;
-        reject(new Error('IMAP connection closed unexpectedly'));
-      }
-    });
-
-    // Add timeout
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        console.error('❌ IMAP connection timeout');
-        try {
-          imap.end();
-        } catch (e) {}
-        reject(new Error('IMAP connection timeout'));
-      }
-    }, 20000);
-
-    // Initiate connection by opening INBOX - triggers the ready event
-    console.log('📧 Testing IMAP connection to', imap_host, 'for user', email_address);
-    imap.openBox('INBOX', false);
-  });
+    console.log('✅ IMAP connection successful via imap-simple');
+    await connection.end();
+    return { success: true, message: 'IMAP connection successful' };
+  } catch (error) {
+    console.error('❌ IMAP test failed:', error.message);
+    throw new Error(`IMAP connection failed: ${error.message}`);
+  }
 };
 
 /**
