@@ -2,7 +2,7 @@ import express from 'express';
 import { supabase } from '../supabase-client.js';
 import requireAuth from '../middleware/require-auth.js';
 import { encryptCredential, decryptCredential } from '../utils/encryption.js';
-import { testIMAPConnection, testSMTPConnection, syncEmailsForAccount, sendEmailViaSMTP } from '../services/email-service.js';
+import { testIMAPConnection, testSMTPConnection, syncEmailsForAccount, sendEmailViaSMTP, fetchEmailsFromIMAP } from '../services/email-service.js';
 
 const router = express.Router();
 
@@ -122,6 +122,59 @@ router.post('/send-test', async (req, res) => {
     }
   } catch (err) {
     console.error('[email-accounts send-test] error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /email-accounts/fetch-test
+ * Fetch incoming emails (no auth required)
+ * Used for quick testing with unverified accounts
+ */
+router.post('/fetch-test', async (req, res) => {
+  try {
+    const {
+      email_address,
+      imap_host,
+      imap_port = 993,
+      imap_password,
+      unreadOnly = true,
+    } = req.body;
+
+    // Validate inputs
+    if (!email_address || !imap_host || !imap_password) {
+      return res.status(400).json({ error: 'Missing required fields: email_address, imap_host, imap_password' });
+    }
+
+    try {
+      const testAccount = {
+        email_address,
+        imap_host,
+        imap_port,
+        imap_encrypted_password: encryptCredential(imap_password),
+      };
+
+      // Get both unread and read emails by modifying fetchEmailsFromIMAP to support options
+      const emails = await fetchEmailsFromIMAP(testAccount, { unreadOnly });
+      console.log(`✅ Fetched ${emails.length} emails from IMAP`);
+
+      return res.json({
+        success: true,
+        count: emails.length,
+        emails: emails,
+        unreadOnly: unreadOnly,
+        message: `Successfully fetched ${emails.length} email(s)`,
+      });
+    } catch (fetchError) {
+      console.error('❌ Failed to fetch emails:', fetchError.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch emails',
+        details: fetchError.message,
+      });
+    }
+  } catch (err) {
+    console.error('[email-accounts fetch-test] error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

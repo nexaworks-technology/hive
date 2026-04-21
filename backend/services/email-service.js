@@ -8,8 +8,9 @@ import { decryptCredential } from '../utils/encryption.js';
 /**
  * Fetch emails from IMAP server using imap-simple
  */
-export const fetchEmailsFromIMAP = async (emailAccount) => {
+export const fetchEmailsFromIMAP = async (emailAccount, options = {}) => {
   const { imap_host, imap_port, email_address, imap_encrypted_password } = emailAccount;
+  const { unreadOnly = true } = options;
   
   let decryptedPassword;
   try {
@@ -40,36 +41,48 @@ export const fetchEmailsFromIMAP = async (emailAccount) => {
     // Open INBOX
     await connection.openBox('INBOX');
 
-    // Search for unread emails
-    const searchResults = await connection.search(['UNSEEN']);
+    // Search criteria - either unread or all emails
+    const searchCriteria = unreadOnly ? ['UNSEEN'] : ['ALL'];
+    const fetchOptions = {
+      bodies: '', // Get all parts including full email
+    };
 
-    if (searchResults.length === 0) {
-      console.log('No new emails found');
+    const messages = await connection.search(searchCriteria, fetchOptions);
+
+    if (messages.length === 0) {
+      console.log(`No ${unreadOnly ? 'unread' : ''} emails found`);
       return emails;
     }
 
-    // Fetch the emails
-    const messages = await connection.fetch(searchResults, { bodies: '' });
+    console.log(`Found ${messages.length} ${unreadOnly ? 'unread' : ''} email(s)`);
 
     // Parse each message
     for (const message of messages) {
       try {
-        const parsed = await simpleParser(message.parts[0].which(''), {});
+        // Get the full email body - with empty bodies string, we get the full email
+        const bodyPart = message.parts && message.parts[0];
         
-        emails.push({
-          messageId: parsed.messageId || `${Date.now()}-${message.attributes.uid}`,
-          inReplyTo: parsed.inReplyTo,
-          subject: parsed.subject || '(no subject)',
-          from: parsed.from?.text || 'unknown@unknown.com',
-          fromName: parsed.from?.name,
-          to: parsed.to?.text || email_address,
-          text: parsed.text || '',
-          html: parsed.html,
-          date: parsed.date,
-          threadId: parsed.headers?.get('x-thread-id') || parsed.messageId,
-        });
+        if (bodyPart && bodyPart.body) {
+          const parsed = await simpleParser(bodyPart.body);
+
+          emails.push({
+            uid: message.attributes.uid,
+            messageId: parsed.messageId || `${Date.now()}-${message.attributes.uid}`,
+            inReplyTo: parsed.inReplyTo,
+            subject: parsed.subject || '(no subject)',
+            from: parsed.from?.text || 'unknown@unknown.com',
+            fromName: parsed.from?.name,
+            to: parsed.to?.text || email_address,
+            text: parsed.text || '',
+            html: parsed.html || '',
+            date: parsed.date,
+            threadId: parsed.headers?.get('x-thread-id') || parsed.messageId,
+          });
+        } else {
+          console.warn(`Email ${message.attributes.uid}: No body part found`);
+        }
       } catch (error) {
-        console.error('Error parsing email:', error);
+        console.error(`Error parsing email ${message.attributes.uid}:`, error.message);
       }
     }
 
