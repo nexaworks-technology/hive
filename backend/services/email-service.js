@@ -167,26 +167,29 @@ export const testIMAPConnection = async (emailAccount) => {
 
     let resolved = false;
 
-    imap.openBox('INBOX', false, (err, box) => {
+    // Handle ready event - connection is authenticated
+    imap.on('ready', () => {
       if (resolved) return;
       resolved = true;
-
-      if (err) {
-        console.error('❌ IMAP test failed:', err.message);
-        imap.end();
-        return reject(new Error(`IMAP connection failed: ${err.message}`));
-      }
-
       console.log('✅ IMAP connection successful');
       imap.end();
       resolve({ success: true, message: 'IMAP connection successful' });
     });
 
+    // Handle errors
     imap.on('error', (err) => {
       if (!resolved) {
         resolved = true;
-        console.error('❌ IMAP error:', err.message);
+        console.error('❌ IMAP test failed:', err.message);
         reject(new Error(`IMAP connection failed: ${err.message}`));
+      }
+    });
+
+    // Handle close
+    imap.on('close', () => {
+      if (!resolved) {
+        resolved = true;
+        reject(new Error('IMAP connection closed unexpectedly'));
       }
     });
 
@@ -195,10 +198,16 @@ export const testIMAPConnection = async (emailAccount) => {
       if (!resolved) {
         resolved = true;
         console.error('❌ IMAP connection timeout');
-        imap.end();
+        try {
+          imap.end();
+        } catch (e) {}
         reject(new Error('IMAP connection timeout'));
       }
     }, 20000);
+
+    // Initiate connection by opening INBOX - triggers the ready event
+    console.log('📧 Testing IMAP connection to', imap_host, 'for user', email_address);
+    imap.openBox('INBOX', false);
   });
 };
 
