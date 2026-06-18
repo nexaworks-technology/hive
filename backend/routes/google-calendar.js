@@ -218,7 +218,22 @@ const buildAvailability = ({ busy, nowUtcMs, days = DEFAULT_LOOKAHEAD_DAYS, slot
 router.get('/status', requireAuth, async (req, res) => {
   try {
     const tokens = await getTokensForUser(req.user.id)
-    res.json({ connected: Boolean(tokens?.refresh_token || tokens?.access_token) })
+    const connected = Boolean(tokens?.refresh_token || tokens?.access_token)
+    
+    let email = null
+    if (connected) {
+      try {
+        const { client } = await setCredentials(tokens, req.user.id)
+        const gmail = google.gmail({ version: 'v1', auth: client })
+        const profile = await gmail.users.getProfile({ userId: 'me' })
+        email = profile.data.emailAddress
+      } catch (gmailErr) {
+        console.warn('[google][status] Failed to fetch Gmail email:', gmailErr.message)
+        // Still return connected: true, but email might be undefined
+      }
+    }
+    
+    res.json({ connected, email })
   } catch (err) {
     console.error('[google][status] error', err)
     res.status(500).json({ error: 'Failed to check status' })

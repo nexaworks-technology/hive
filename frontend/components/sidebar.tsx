@@ -10,7 +10,6 @@ import { workflowManager, type WorkflowState } from '@/lib/workflow-context';
 import { useSessionContext } from '@/components/auth-provider';
 import { supabase } from '@/lib/supabase-client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { EmailSettingsSection } from '@/components/email-settings';
 import {
   PanelLeftClose,
   PanelRightClose,
@@ -20,11 +19,6 @@ import {
   Moon,
   ChevronRight,
   LayoutDashboard,
-  Mail,
-  User,
-  Calendar,
-  SlidersHorizontal,
-  Plus,
   Inbox,
 } from 'lucide-react';
 
@@ -39,7 +33,6 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
@@ -47,7 +40,6 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleEmail, setGoogleEmail] = useState('');
-  const [selectedSection, setSelectedSection] = useState('general');
   const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
   const profileName =
@@ -66,14 +58,6 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     }
   };
 
-  useEffect(() => {
-    const root = document.documentElement.classList;
-    if (isDarkMode) {
-      root.add('dark');
-    } else {
-      root.remove('dark');
-    }
-  }, [isDarkMode]);
 
   useEffect(() => {
     const unsubscribe = workflowManager.subscribe(setWorkflowState);
@@ -130,7 +114,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(payload?.error || 'Failed to check Google status');
         setGoogleConnected(Boolean(payload?.connected));
-        setGoogleEmail(payload?.email || 'hello@nexaworks.tech');
+        setGoogleEmail(payload?.email || '');
       } catch (error) {
         console.error('Failed to check Google status', error);
         setGoogleConnected(false);
@@ -157,7 +141,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           <img
             src="/assests/hivelogo.svg"
             alt="Hive logo"
-            className={`flex-shrink-0 dark:invert dark:brightness-0 ${!isOpen && isHovering ? 'hidden' : 'h-8 w-8'}`}
+            className={`shrink-0 dark:invert dark:brightness-0 ${!isOpen && isHovering ? 'hidden' : 'h-8 w-8'}`}
           />
           <div className={`flex flex-col transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 w-0'}`}>
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Beta</span>
@@ -185,7 +169,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         </Button>
       </div>
 
-      <div className="px-4 pb-4 flex-shrink-0">
+      <div className="px-4 pb-4 shrink-0">
         <Button
           variant="ghost"
           className={`${isOpen ? 'w-full justify-start gap-2' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
@@ -198,7 +182,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           <span className={isOpen ? 'inline-flex' : 'hidden'}>Dashboard</span>
         </Button>
 
-        <div className="mt-0 flex flex-col flex-shrink-0">
+        <div className="mt-0 flex flex-col shrink-0">
           <Button
             variant="ghost"
             className={`${isOpen ? 'w-full justify-start gap-2 mt-2' : 'w-12 h-12 p-0 flex items-center justify-center mt-2'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white hover:shadow-sm transition-shadow`}
@@ -218,7 +202,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <span>campaigns</span>
             <ChevronRight className="w-5 h-5" />
           </div>
-          <div className={`${isOpen ? 'mt-2 max-h-[150px] overflow-y-auto space-y-1 pr-1 flex-shrink' : 'hidden'}`}>
+          <div className={`${isOpen ? 'mt-2 max-h-37.5 overflow-y-auto space-y-1 pr-1 shrink' : 'hidden'}`}>
             {isLoadingCampaigns ? (
               <div className="space-y-1 pr-1" aria-label="Loading campaigns">
                 {[0, 1, 2].map((i) => (
@@ -258,104 +242,11 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         <Button
           variant="ghost"
           className={`${isOpen ? 'w-full justify-start gap-3' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white`}
-          onClick={() => setSettingsOpen(true)}
+          onClick={() => router.push('/profile/settings')}
         >
           <Settings className="w-8 h-8" />
           <span className={isOpen ? 'inline-flex' : 'hidden'}>Settings</span>
         </Button>
-        {/* Settings Dialog with section switching */}
-        <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-          <DialogContent className="w-[850px] max-w-3xl p-0 overflow-hidden backdrop-blur-3xl">
-            <div className="flex h-[520px]">
-              {/* Left section: menu */}
-              <div className="w-1/3 bg-muted/40 border-r p-8 flex flex-col gap-3 min-w-[200px]">
-                <div className="text-lg font-semibold mb-4">Settings</div>
-                {[
-                  { key: 'general', label: 'General', icon: <SlidersHorizontal className="w-5 h-5 mr-2 inline" /> },
-                  { key: 'edit-email', label: 'Email Accounts', icon: <Mail className="w-5 h-5 mr-2 inline" /> },
-                  { key: 'calendar', label: 'Calendar', icon: <Calendar className="w-5 h-5 mr-2 inline" /> },
-                  { key: 'account', label: 'Account', icon: <User className="w-5 h-5 mr-2 inline" /> },
-                ].map((s) => (
-                  <button
-                    key={s.key}
-                    className={`flex items-center text-left text-base px-3 py-2 rounded-md font-medium transition-colors ${selectedSection === s.key ? 'bg-background text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'}`}
-                    onClick={() => setSelectedSection(s.key)}
-                  >
-                    {s.icon}
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-              {/* Right section: details */}
-              <div className="flex-1 p-12 overflow-y-auto">
-                {selectedSection === 'general' && (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle className="text-2xl mb-4">General</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-6">
-                      <div>
-                        <div className="text-base font-medium mb-1">Appearance</div>
-                        <div className="flex items-center justify-between">
-                          <span>System</span>
-                          <Switch checked={isDarkMode} onCheckedChange={setIsDarkMode} />
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-                {selectedSection === 'edit-email' && (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle className="text-2xl mb-4">Email Accounts</DialogTitle>
-                    </DialogHeader>
-                    <EmailSettingsSection session={session} />
-                  </>
-                )}
-                {selectedSection === 'calendar' && (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle className="text-2xl mb-4">Calendar</DialogTitle>
-                    </DialogHeader>
-                    <div className="text-muted-foreground">Calendar settings coming soon.</div>
-                  </>
-                )}
-                {selectedSection === 'account' && (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle className="text-2xl mb-4">Account</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-6">
-                      <div>
-                        <div className="text-base font-medium mb-3">Email Connection</div>
-                        <div className="p-4 border border-border rounded-lg bg-muted/30">
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-sm font-medium">Gmail/Google Workspace</p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {googleConnected ? '✅ Connected' : '❌ Not connected'}
-                              </p>
-                            </div>
-                            {googleConnected && (
-                              <div className="pt-2 border-t border-border">
-                                <p className="text-xs text-muted-foreground mb-1">Connected Gmail:</p>
-                                <p className="text-sm font-medium">{googleEmail || 'hello@nexaworks.tech'}</p>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-4">
-                            Your Google account is connected to enable email sending and calendar integration.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-                {/* No Close button as requested */}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
         <Button
           variant="ghost"
           className={`${isOpen ? 'w-full justify-start gap-3' : 'w-12 h-12 p-0 flex items-center justify-center'} text-sidebar-foreground dark:text-white hover:bg-[#efefef] dark:hover:bg-[#303030] hover:text-black dark:hover:text-white`}

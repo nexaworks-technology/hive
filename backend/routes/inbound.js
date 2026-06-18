@@ -12,7 +12,7 @@ const router = express.Router();
 // ─── OpenRouter AI Setup ─────────────────────────────────────────────────────
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const AI_MODEL = 'google/gemini-2.0-flash-001';
+const AI_MODEL = 'openai/gpt-4o-mini';
 
 /**
  * Call OpenRouter API to generate a personalized email for a single lead.
@@ -28,20 +28,29 @@ async function generateEmail({ lead, settings }) {
   };
   const ctaText = ctaMap[ctaStyle] || 'connect briefly';
 
-  const systemPrompt = `You are a world-class B2B sales email writer for ${agencyName}.
-Write a short, highly personalized outreach email.
-Tone: ${tone || 'professional'}.
-Goal: get the recipient to ${ctaText}.
-Service: ${service}.
-Value proposition: ${valueProp}.
+  const systemPrompt = `You are an elite B2B sales copywriter for ${agencyName}.
+Write a highly personalized, conversion-focused outreach email.
+
+INPUTS:
+- Recipient Role: ${title}
+- Recipient Company: ${company}
+- Your Service: ${service}
+- Your Value Proposition: ${valueProp}
+- Requested Tone: ${tone || 'professional but conversational'}
+- Goal Action: Get them to ${ctaText}
+
+FOLLOW THIS EXACT EMAIL TEMPLATE STRUCTURE:
+1. Subject Line: Catchy, short (under 5 words), and highly relevant to ${company} or their role.
+2. The Hook (Sentence 1): A hyper-personalized opening that acknowledges their specific role as ${title} at ${company}. No generic "Hope you are well" openers.
+3. The Context (Sentence 2): Briefly highlight a common challenge or opportunity related to their role that your service addresses.
+4. The Solution (Sentence 3-4): Introduce ${agencyName} and explain how your ${service} delivers the specific value: ${valueProp}. Make it punchy.
+5. The Call to Action (Sentence 5): A single, clear, low-friction question asking them to ${ctaText}. You MUST use exactly "[CALENDAR_LINK]" as the placeholder if you ask them to book a time.
 
 RULES:
-- Maximum 5 sentences total (subject excluded)
-- Sentence 1 must naturally reference their role (${title}) or company (${company})
-- No generic openers like "I hope this finds you well" or "I wanted to reach out"
-- End with exactly ONE clear call to action. You MUST use exactly "[CALENDAR_LINK]" as the placeholder if you ask them to book a time.
-- Keep it conversational, not corporate
-- Return ONLY valid JSON with keys "subject" and "body" — no markdown, no commentary`;
+- Keep the email structured with line breaks between paragraphs to make it highly readable.
+- Limit the body to exactly 5 or 6 sentences.
+- Sound human, authentic, and completely natural.
+- Return ONLY valid JSON with keys "subject" and "body" — no markdown code blocks, no commentary.`;
 
   const userPrompt = `Write an outreach email to ${name}, ${title} at ${company}.`;
 

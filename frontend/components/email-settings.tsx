@@ -1,32 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { Mail, Check, X, Loader2, Trash2, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Mail, Check, X, Loader2, Trash2, Plus, Zap } from 'lucide-react';
 import { toastManager } from '@/components/toast-notification';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
 export function EmailSettingsSection({ session }) {
+  const router = useRouter();
   const [emailAccounts, setEmailAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
   const [testingId, setTestingId] = useState(null);
-  const [testingForm, setTestingForm] = useState(false);
-  const [testResults, setTestResults] = useState(null);
-
-  const [formData, setFormData] = useState({
-    email_address: '',
-    imap_host: '',
-    imap_port: 993,
-    imap_password: '',
-    smtp_host: '',
-    smtp_port: 587,
-    smtp_password: '',
-  });
+  const [settingPrimaryId, setSettingPrimaryId] = useState(null);
 
   // Load email accounts
   useEffect(() => {
@@ -49,113 +38,6 @@ export function EmailSettingsSection({ session }) {
         title: 'Failed to load email accounts',
         type: 'error',
       });
-    }
-  };
-
-  const handleAddAccount = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      console.log('📧 Adding email account...');
-      const res = await fetch(`${apiBaseUrl}/email-accounts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to add email account');
-      }
-
-      console.log('✅ Email account added:', data.emailAccount);
-      toastManager.notify({
-        title: 'Email account connected',
-        message: `${formData.email_address} is now connected`,
-        type: 'success',
-      });
-
-      setFormData({
-        email_address: '',
-        imap_host: '',
-        imap_port: 993,
-        imap_password: '',
-        smtp_host: '',
-        smtp_port: 587,
-        smtp_password: '',
-      });
-      setShowAddForm(false);
-      setTestResults(null);
-      await fetchEmailAccounts();
-    } catch (err) {
-      console.error('Error adding account:', err);
-      toastManager.notify({
-        title: 'Failed to add email account',
-        message: err.message,
-        type: 'error',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleTestFormConnection = async () => {
-    if (!formData.email_address || !formData.imap_host || !formData.imap_password || !formData.smtp_host || !formData.smtp_password) {
-      toastManager.notify({
-        title: 'Missing fields',
-        message: 'Please fill in all email and password fields',
-        type: 'error',
-      });
-      return;
-    }
-
-    setTestingForm(true);
-
-    try {
-      console.log('🧪 Testing email connection...');
-      const res = await fetch(`${apiBaseUrl}/email-accounts/test-form`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Test failed');
-      }
-
-      setTestResults(data.results);
-
-      const imapStatus = data.results.imap.success ? '✅ IMAP Connected' : `❌ IMAP Failed: ${data.results.imap.error}`;
-      const smtpStatus = data.results.smtp.success ? '✅ SMTP Connected' : `❌ SMTP Failed: ${data.results.smtp.error}`;
-
-      toastManager.notify({
-        title: 'Test Results',
-        message: `${imapStatus} | ${smtpStatus}`,
-        type: data.results.imap.success && data.results.smtp.success ? 'success' : 'error',
-      });
-    } catch (err) {
-      console.error('Error testing connection:', err);
-      toastManager.notify({
-        title: 'Connection test failed',
-        message: err.message,
-        type: 'error',
-      });
-      setTestResults({
-        imap: { success: false, error: err.message },
-        smtp: { success: false, error: err.message }
-      });
-    } finally {
-      setTestingForm(false);
     }
   };
 
@@ -248,6 +130,39 @@ export function EmailSettingsSection({ session }) {
     }
   };
 
+  const handleSetPrimary = async (accountId) => {
+    setSettingPrimaryId(accountId);
+    try {
+      const res = await fetch(`${apiBaseUrl}/email-accounts/${accountId}/set-primary`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to set primary email');
+      }
+
+      toastManager.notify({
+        title: 'Success',
+        message: 'Primary sending email updated',
+        type: 'success',
+      });
+
+      await fetchEmailAccounts();
+    } catch (err) {
+      console.error('Error setting primary:', err);
+      toastManager.notify({
+        title: 'Failed to set primary email',
+        message: err.message,
+        type: 'error',
+      });
+    } finally {
+      setSettingPrimaryId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -264,10 +179,18 @@ export function EmailSettingsSection({ session }) {
       <div className="space-y-3">
         {emailAccounts.length > 0 &&
           emailAccounts.map((account) => (
-            <Card key={account.id} className="p-4 border-border bg-secondary/30">
+            <Card key={account.id} className="rounded-none p-4 border-border bg-secondary/30">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className="font-medium text-foreground">{account.email_address}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-medium text-foreground">{account.email_address}</p>
+                    {account.is_active && (
+                      <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 gap-1">
+                        <Zap className="w-3 h-3" />
+                        Running
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     IMAP: {account.imap_host}:{account.imap_port}
                   </p>
@@ -282,6 +205,23 @@ export function EmailSettingsSection({ session }) {
                 </div>
 
                 <div className="flex gap-2">
+                  {!account.is_active && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleSetPrimary(account.id)}
+                      disabled={settingPrimaryId === account.id}
+                      className="gap-2 bg-blue-600 hover:bg-blue-700"
+                    >
+                      {settingPrimaryId === account.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4" />
+                      )}
+                      Set as Primary
+                    </Button>
+                  )}
+                  
                   <Button
                     size="sm"
                     variant="outline"
@@ -320,219 +260,16 @@ export function EmailSettingsSection({ session }) {
           ))}
       </div>
 
-      {/* Add New Account Form */}
-      {!showAddForm ? (
-        <Button
-          onClick={() => setShowAddForm(true)}
-          className="gap-2 w-full"
-          variant="outline"
-        >
-          <Plus className="w-4 h-4" />
-          Add Email Account
-        </Button>
-      ) : (
-        <Card className="p-6 border-border">
-          <h4 className="font-semibold text-foreground mb-4">Add Email Account</h4>
+      {/* Add New Account Button */}
+      <Button
+        onClick={() => router.push('/profile/email-setup')}
+        className="gap-2 w-full bg-blue-600 hover:bg-blue-700"
+      >
+        <Plus className="w-4 h-4" />
+        Add Email Account
+      </Button>
 
-          <form onSubmit={handleAddAccount} className="space-y-4">
-            <div>
-              <Label htmlFor="email" className="text-sm">
-                Email Address
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="hello@company.com"
-                value={formData.email_address}
-                onChange={(e) =>
-                  setFormData({ ...formData, email_address: e.target.value })
-                }
-                required
-                className="mt-2"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="imap_host" className="text-sm">
-                  IMAP Host
-                </Label>
-                <Input
-                  id="imap_host"
-                  placeholder="imap.company.com"
-                  value={formData.imap_host}
-                  onChange={(e) =>
-                    setFormData({ ...formData, imap_host: e.target.value })
-                  }
-                  required
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="imap_port" className="text-sm">
-                  IMAP Port
-                </Label>
-                <Input
-                  id="imap_port"
-                  type="number"
-                  value={formData.imap_port}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      imap_port: parseInt(e.target.value),
-                    })
-                  }
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="imap_password" className="text-sm">
-                IMAP Password
-              </Label>
-              <Input
-                id="imap_password"
-                type="password"
-                placeholder="Your IMAP password"
-                value={formData.imap_password}
-                onChange={(e) =>
-                  setFormData({ ...formData, imap_password: e.target.value })
-                }
-                required
-                className="mt-2"
-              />
-            </div>
-
-            <hr className="my-4" />
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="smtp_host" className="text-sm">
-                  SMTP Host
-                </Label>
-                <Input
-                  id="smtp_host"
-                  placeholder="smtp.company.com"
-                  value={formData.smtp_host}
-                  onChange={(e) =>
-                    setFormData({ ...formData, smtp_host: e.target.value })
-                  }
-                  required
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="smtp_port" className="text-sm">
-                  SMTP Port
-                </Label>
-                <Input
-                  id="smtp_port"
-                  type="number"
-                  value={formData.smtp_port}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      smtp_port: parseInt(e.target.value),
-                    })
-                  }
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="smtp_password" className="text-sm">
-                SMTP Password
-              </Label>
-              <Input
-                id="smtp_password"
-                type="password"
-                placeholder="Your SMTP password"
-                value={formData.smtp_password}
-                onChange={(e) =>
-                  setFormData({ ...formData, smtp_password: e.target.value })
-                }
-                required
-                className="mt-2"
-              />
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleTestFormConnection}
-                disabled={testingForm || isLoading}
-                className="gap-2"
-              >
-                {testingForm ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )}
-                Test Connection
-              </Button>
-
-              <Button
-                type="submit"
-                disabled={isLoading || testingForm}
-                className="flex-1 gap-2"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  'Connect'
-                )}
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowAddForm(false);
-                  setTestResults(null);
-                }}
-                disabled={isLoading || testingForm}
-              >
-                Cancel
-              </Button>
-            </div>
-
-            {testResults && (
-              <div className="mt-4 p-3 rounded-lg border">
-                <p className="text-sm font-semibold mb-2">Test Results:</p>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    {testResults.imap.success ? (
-                      <Check className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <X className="w-4 h-4 text-red-600" />
-                    )}
-                    <span>
-                      IMAP: {testResults.imap.success ? 'Connected' : testResults.imap.error}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {testResults.smtp.success ? (
-                      <Check className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <X className="w-4 h-4 text-red-600" />
-                    )}
-                    <span>
-                      SMTP: {testResults.smtp.success ? 'Connected' : testResults.smtp.error}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </form>
-        </Card>
-      )}
-
-      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-900 dark:text-blue-100">
+      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-4 text-sm text-blue-900 dark:text-blue-100">
         <p className="font-semibold mb-2">💡 How to find your email settings:</p>
         <ul className="space-y-1 text-xs">
           <li>• <strong>Microsoft 365/Outlook:</strong> IMAP: outlook.office365.com:993, SMTP: smtp.office365.com:587</li>

@@ -430,6 +430,46 @@ router.post('/:id/send', async (req, res) => {
 });
 
 /**
+ * PATCH /email-accounts/:id/set-primary
+ * Set an email account as the primary one for sending
+ */
+router.patch('/:id/set-primary', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // First, set all user's accounts to inactive
+    const { error: updateAllError } = await supabase
+      .from('email_accounts')
+      .update({ is_active: false })
+      .eq('user_id', req.user.id);
+
+    if (updateAllError) {
+      console.error('[email-accounts set-primary] error updating all:', updateAllError);
+      return res.status(500).json({ error: 'Failed to update email accounts' });
+    }
+
+    // Then, set the specified account as active
+    const { data, error: updateError } = await supabase
+      .from('email_accounts')
+      .update({ is_active: true })
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .select();
+
+    if (updateError || !data || data.length === 0) {
+      console.error('[email-accounts set-primary] error updating account:', updateError);
+      return res.status(404).json({ error: 'Email account not found' });
+    }
+
+    console.log('✅ Email account set as primary:', id);
+    return res.json({ success: true, message: 'Email account set as primary', emailAccount: data[0] });
+  } catch (err) {
+    console.error('[email-accounts set-primary] error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * DELETE /email-accounts/:id
  * Remove an email account
  */
